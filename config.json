@@ -1,0 +1,25 @@
+{
+	"general": {
+        "company":"Alexander Chistyakov",
+        "logo":"FVS",
+		"port": 80,
+        "delimeter": {
+            "web": " | ",
+            "email": " - "
+        },
+        "description":[
+            "Keycards taken to the next level"
+        ],
+        "production": false
+	},
+	"database": {
+        "reset": false,
+        "sync": true,
+        "debug": false,
+        "protocol": "mysql:",
+        "host": "127.0.0.1",
+        "database": "fvscard",
+        "user": "fvsadmin",
+        "password": "danes"
+    }
+}
