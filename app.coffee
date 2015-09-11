@@ -49,20 +49,6 @@ app.use session
     resave: true
     saveUninitialized: true
 
-app.use passport.initialize()
-app.use passport.session()
-
-passport.use "local-login", new passportLocal.Strategy authHandler.login
-passport.use "local-register", new passportLocal.Strategy
-    usernameField: "email"
-    passwordField: "password"
-    passReqToCallback: true
-, authHandler.register
-
-passport.serializeUser authHandler.serialize
-
-passport.deserializeUser authHandler.deserialize
-
 app.use dbModels.express
 
 #app.use require "./test"
@@ -73,9 +59,9 @@ app.use "/", routes
 
 # catch 404 and forward to error handler
 app.use (req, res, next) ->
-    err = new Error("Not Found");
-    err.status = 404;
-    next(err);
+    err = new Error("Not Found")
+    err.status = 404
+    next(err)
 
 # production error handler
 if app.get("env") is "development"
@@ -92,6 +78,6 @@ app.use (err, req, res, next) ->
         message: err.message,
         error: {}
 
-module.exports = app;
+module.exports = app
 
 server.listen config.general.port
