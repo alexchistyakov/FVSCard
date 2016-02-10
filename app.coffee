@@ -1,4 +1,4 @@
-express = require "express"
+express = require("express.io")
 path = require "path"
 favicon = require "serve-favicon"
 logger = require "morgan"
@@ -8,19 +8,28 @@ session = require "express-session"
 ejs = require "ejs"
 passport = require "passport"
 passportLocal = require "passport-local"
+net = require "json-over-tcp"
 
-dbModels = require "./models"
+dbModels = require "./dbmodels"
 config = require "./config"
 routes = require "./routes"
 authPage = require "./routes/auth"
 authHandler = require "./routes/auth/authentication"
 assets = require "./public"
 globals = require "./routes/requestglobals.coffee"
-
-require("./lib")()
+readerHandler = require "./reader"
 
 app = express()
-server = require("http").createServer app
+server = app.http()
+server.io()
+
+readerServer = net.createServer()
+
+readerHandler.useIo app.io
+readerHandler.useTcp readerServer
+readerHandler.init()
+
+readerServer.listen config.readers.port
 
 #Declare a global reference to jquery
 GLOBAL.$ = require "jquery"
@@ -37,9 +46,10 @@ app.set "x-powered-by", false
 app.use logger "dev"
 app.use cookieParser()
 app.use bodyParser.urlencoded
-    extended: false
+  extended: true
 
 app.use "/img",express.static __dirname+"/public/images"
+app.use "/images",express.static __dirname+"/public/images"
 app.use "/init",express.static __dirname+"/public/coffee/init"
 
 assets.init app,server
@@ -49,14 +59,29 @@ app.use session
     resave: true
     saveUninitialized: true
 
+app.use passport.initialize()
+app.use passport.session()
+
+passport.use "local-login", new passportLocal.Strategy authHandler.login
+passport.use "local-register", new passportLocal.Strategy
+    usernameField: "username"
+    passwordField: "password"
+    passReqToCallback: true
+, authHandler.register
+
+passport.serializeUser authHandler.serialize
+
+passport.deserializeUser authHandler.deserialize
+
 app.use dbModels.express
 
 #app.use require "./test"
 
 app.use globals.express
 
-app.use "/", routes
+app.use readerHandler.express
 
+routes app
 # catch 404 and forward to error handler
 app.use (req, res, next) ->
     err = new Error("Not Found")
@@ -80,4 +105,4 @@ app.use (err, req, res, next) ->
 
 module.exports = app
 
-server.listen config.general.port
+app.listen config.general.port

@@ -1,0 +1,15 @@
+<% include ./includes/start.html %>
+<div class="popup">
+    <form class="form" action="/login/" autocomplete="off" method="post">
+        <div class="header">Login</div>
+        <div class="info">
+            <input class="input" type="text" name="username" placeholder="Username" required/>
+            <input class="input" type="password" name="password" placeholder="Password" required/>
+            <div class="error-message"></div>
+        </div>
+        <div class="submit">
+            <input class="button" type="submit" value="Sign In"/>
+        </div>
+    </form>
+</div>
+<% include ./includes/end.html %>

@@ -1,0 +1,53 @@
+<% include ./includes/start.html %>
+<div class="menubar-container">
+  <div class="menubar-container-top">
+    <div class="logo">
+      <img src="/img/red_banner_logo.png"></img>
+    </div>
+    <div class="status-container">
+      <div class="status-label"></div>
+      <div class="action-switcher-container">
+        <ul class="tabs" id="action-switcher" style="display:none;">
+          <li class="as-tab" id="parietals-switcher"></li>
+          <li class="as-tab" id="checkin-switcher"></li>
+          <li class="as-tab" id="dxwx-switcher"></li>
+          <li class="as-tab" id="stayingover-switcher"></li>
+        </ul>
+      </div>
+    </div>
+    <div class="button-container"></div>
+  </div>
+</div>
+<div class="main-container">
+  <div class="side-container-left">
+    <div class="action-toolbar">
+      <div class="menu-title" id="toolbar-title"></div>
+    </div>
+    <div class="student-lists">
+      <div class="lists-header">
+        <ul class="tabs" id="lists-tab-handle"></ul>
+        <input type="text" class="list-search-bar" id="student-searchbar" placeholder="Search">
+      </div>
+      <div class="lists-body"></div>
+    </div>
+  </div>
+  <div class="list-container">
+    <div class="tabhandle">
+       <ul class="tabs" id="tab-container"></ul>
+    </div>
+    <div class="bottom-container">
+      <input type="text" class="list-search-bar" placeholder="Search">
+      <div class="student-list"></div>
+    </div>
+  </div>
+  <div class="side-container-right">
+    <div class="reader-container">
+      <div class="reader-icon"></div>
+      <div class="reader-info-container">
+        <div class="reader-message"></div>
+        <div class="reader-action-container"></div>
+      </div>
+    </div>
+  </div>
+</div>
+<% include ./includes/end.html %>

@@ -1,0 +1,60 @@
+body {
+	background: #f5f5f5;
+	text-align: center;
+	font-family: "proxima-nova","Helvetica Neue",Helvetica,Arial,sans-serif;
+}
+body .popup {
+	text-align: left;
+	width: 400px;
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 2;
+}
+body .popup .form {
+	overflow: hidden;
+	background: #fff;
+	border: solid 1px #ddd;
+	box-shadow: 2px 0 4px rgba(0,0,0,0,0.05);
+	border-radius: 10px;
+}
+body .popup .form .header {
+	color: #ffffff;
+  background-color: #BA2500;
+	padding: 10px 0;
+	text-align: center;
+	border-bottom: solid 1px #ddd;
+	box-shadow: inset 0 1px 0 #fff;
+}
+body .popup .form .info {
+	padding: 15px;
+	background: #fafafa;
+}
+body .popup .form .info .input {
+  font-size: 13px;
+  color: #333;
+  background: #fff;
+  padding: 10px;
+  padding-right: -20px;
+  margin-bottom: 10px;
+  border: solid 1px #dedede;
+  width: 100%;
+  box-shadow: inset 0 1px 3px #efefef
+}
+body .popup .form .info .error-message {
+	color:#f44;
+}
+body .popup .form .submit {
+	padding: 10px 15px;
+	background: #ffffff;
+}
+body .popup .form .button {
+	width: 100%;
+    text-align: center;
+    padding: 8px 0;
+    font-size: 14px;
+    color: #fff;
+    cursor: pointer;
+    border: solid 1px #ddd;
+}

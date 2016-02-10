@@ -3,15 +3,17 @@ module.exports = (db,models) ->
   db.define "checkin_session",
     pub_id:
       type: "text"
-    board_id:
+    student_id:
       type: "text"
       required: true
-    date:
+    date_leave:
       type: "date"
       required: true
+    date_return:
+      type: "date"
     type:
       type: "enum"
-      values: ["Lunch","Dinner"]
+      values: ["DX","WX"]
       required: true
     open:
       type: "boolean"

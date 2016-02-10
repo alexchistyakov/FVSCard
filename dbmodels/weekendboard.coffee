@@ -1,17 +1,13 @@
 rand = require "generate-key"
 module.exports = (db,models) ->
-  db.define "checkin_session",
+  db.define "weekend_board",
     pub_id:
       type: "text"
-    board_id:
-      type: "text"
-      required: true
-    date:
+    date_start:
       type: "date"
       required: true
-    type:
-      type: "enum"
-      values: ["Lunch","Dinner"]
+    date_end:
+      type: "date"
       required: true
     open:
       type: "boolean"

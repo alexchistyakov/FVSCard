@@ -1,10 +1,16 @@
-express = require 'express'
-router  = express.Router()
+inSessionHandler = require "./sessionhandler"
+authPage         = require "./auth"
+authHandler      = require "./auth/authentication"
+api              = require "./api"
 
-sessionHandler   = require "./sessionhandler"
-inSessionHandler = require "./sessionhandler/insession"
+module.exports = (app)->
+  app.get '/', inSessionHandler.verifyAuthAndRedirect
 
-router.get '/', sessionHandler.inputSession
-router.post '/', sessionHandler.joinSession
+  app.get  '/login', authPage.loginPage
+  app.post '/login', authHandler.authenticateLogin
 
-router.get '/checkin', inSessionHandler.showSessionPage
+  app.get '/checkin', inSessionHandler.showSessionPage
+
+  app.get '/api', api.express
+  app.post '/api', api.express
+
