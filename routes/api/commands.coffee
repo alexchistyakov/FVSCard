@@ -43,8 +43,9 @@ module.exports =
         callback false, "Weekend Board Already Exists"
       else
         date = new Date req.param "date"
-        date_end = date.setDate date.getDate + 2
-        req.models.checkinSession.create
+        date_end = new Date date
+        date_end.setDate date.getDate() + 2
+        req.models.weekendBoard.create
           date_start: date
           date_end: date_end
           open: false
@@ -161,7 +162,7 @@ module.exports =
         callback false, "Board not found"
       else
         board.open = req.param("open") is "true"
-        session.save (err) ->
+        board.save (err) ->
           if err?
             callback false, err
           else

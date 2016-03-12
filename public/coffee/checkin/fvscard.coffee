@@ -20,8 +20,8 @@ StudentStatus =
     bgcolor: "#0099FF"
     text: "WX"
 
-SessionStatus =
-  notInSession:
+BoardStatus =
+  notInBoard:
     id: 0
     elements:
       openSession:
@@ -32,13 +32,13 @@ SessionStatus =
         html: "<div class=\"button-manipulate-session\">Create</div>"
         action: ->
           window.FVSCard.dataManager.beginCreateBoard()
-  inSession:
+  inBoard:
     id: 1
     elements:
       manipulate:
         html: null
         update: ->
-          @html = "<div class=\"button-manipulate-session\">#{if window.FVSCard.dataManager.session.open then "Close" else "Open"}</div>"
+          @html = "<div class=\"button-manipulate-session\">#{if window.FVSCard.dataManager.board.open then "Close" else "Open"}</div>"
 
         action: ->
           window.FVSCard.dataManager.beginFlipBoardStatus()
@@ -56,11 +56,12 @@ class FVSCardUI
     @popupSessionInfoHTML = uiData.popup_createsession
     @popupConfirmDialogHTML = uiData.popup_closesession
     @popupMessageDialogHTML = uiData.popup_message
-    @popupWeekendBoardInfoHTML = uiData.popup_opensession
+    @popupWeekendBoardInfoHTML = uiData.popup_loadboard
+    console.log uiData
 
-    @menuBar = new FVSTopMenuBar()
     @sideContainerRight = new FVSSideContainer @
     @tabPane = new FVSBottomTabPane @
+    @menuBar = new FVSTopMenuBar @tabPane
     @studentList = new FVSStudentListPane null
     screen = new FVSSideScreen @studentList, @
     screen.assignSearchbar new FVSStudentSearchBar null, @
@@ -157,21 +158,36 @@ class FVSSideContainer
 
 class FVSTopMenuBar
   buttonContainerSelector: ".menubar-container-top .button-container"
-  statusLabelSelector: ".menubar-container-top .status-label"
+  statusLabelSelector: ".menubar-container-top .status-container .status-label"
   actionSwitcherSelector: "#action-switcher"
 
   constructor: (tabPane) ->
     @tabPane = tabPane
+    @currentIndex = 0
+    $actionSwitcher = $(@actionSwitcherSelector)
+    $actionSwitcher.find("li").each (index, element) =>
+      console.log element
+      $(element).click =>
+        @currentIndex = index
+        @tabPane.setScreen index
+        @update()
 
   update: ->
+    $actionSwitcher = $(@actionSwitcherSelector)
     if @board?
-      @updateState SessionStatus.inSession
-      @updateLabel "Weekend Board - " + moment(new Date @board.date_start).format("MMMM Do YYYY") +" - "+moment(new Date @board.date_end).format("MMMM Do YYYY")+ " - " + if @board.open then "Open" else "Not Open"
-      $(@actionSwitcherSelector).show()
+      @updateState BoardStatus.inBoard
+      @updateLabel "Weekend Board - " + moment(new Date @board.date_start).format("MMMM Do YYYY") + " - " + moment(new Date @board.date_end).format("MMMM Do YYYY") + " - " + if @board.open then "Open" else "Not Open"
+      $actionSwitcher.show()
+      $actionSwitcher.find("li").each (index, element) =>
+        if @currentIndex is index
+          $(element).addClass "pressed"
+        else
+          $(element).removeClass "pressed"
+      @tabPane.setScreen @currentIndex
     else
-      @updateState SessionStatus.notInSession
+      @updateState BoardStatus.notInBoard
       @updateLabel "No Weekend Board Loaded"
-      $(@actionSwitcherSelector).hide()
+      $actionSwitcher.hide()
 
     $buttonContainer = $ @buttonContainerSelector
     $buttonContainer.empty()
@@ -197,8 +213,9 @@ class FVSTopMenuBar
     @update()
 
 class FVSBottomTabPane
+  tabHandleSelector: ".main-container .list-container .tabhandle .tab-container"
+  listContainerSelector: ".main-container .list-container .bottom-container .student-list"
   tabScreenMap: []
-  currentIndex: 0
 
   constructor: (ui) ->
     @tabPaneSelector = ".list-container"
@@ -206,10 +223,15 @@ class FVSBottomTabPane
     @ui = ui
 
   setScreen: (screen) ->
-    @screen = screen
+    @screen = @tabScreenMap[screen]
 
   update: ->
-    @screen.update()
+    @screen.update() if @screen?
+
+  render: ->
+    if @screen?
+      @screen.renderTabHandle $ @tabHandleSelector
+      @screen.renderList $ @listContainerSelector
 
 class FVSStudentListPane
 
@@ -224,6 +246,10 @@ class FVSStudentListPane
     @screen = screen
     if @screen?
       $(@titleSelector).text @screen.name
+
+  enableActionButtons: ->
+
+  disableActionButtons: ->
 
   triggerUpdate: ->
     @render()
@@ -307,6 +333,12 @@ class FVSCheckinScreen extends FVSScreen
   constructor: (tabPane, ui) ->
     super "Checkin",tabPane, ui
     @assignSearchbar new FVSStudentSearchBar null, @ui
+
+  renderList: ($tabPaneList) ->
+    unless FVSCard.dataManager.session?
+      $tabHandle.append "<div class=\"todo\">No Meal Check Currently Loaded</div>"
+    else
+      super $tabPaneList
 
 class FVSStudentSearchBar
 
@@ -413,14 +445,17 @@ class FVSPopupWeekendBoardDataInput extends FVSPopup
 
   element: ->
     $element = super()
-    $element.find(@datpickerSelector).datepicker
+    $element.find(@datePickerSelector).datepicker
       beforeShowDay: (jdate)->
-        date = moment(jdate)
+        date = moment jdate
         if date.isoWeekday() is 6 or date.isoWeekday() is 7
           return [true, "", "Available"]
         return [false, "", "unAvailable"]
+    $element
+
   submit: =>
     date = $(@datePickerSelector).val()
+    @dump()
     @callback date
 
 class FVSPopupConfirmDialog extends FVSPopup
@@ -641,6 +676,9 @@ class FVSCardDataManager
     console.log @session
     @submitUpdateSession !@session.open
 
+  flipBoardStateAndSubmit: =>
+    @submitUpdateBoard !@board.open
+
   submitUpdateSession: (state)=>
     console.log state
     if @session?
@@ -651,6 +689,16 @@ class FVSCardDataManager
       , "GET", (response) ->
         if not response.success and response.data?
           @ui.showMessageDialog "Error",response.data
+
+  submitUpdateBoard: (state) =>
+    if @board?
+      @request
+        command: "update-board-state"
+        boardId: @board.pub_id
+        open: state
+      , "GET", (response) ->
+        if not response.success and response.data?
+          @ui.showMessageDialog "Error", response.data
 
   submitEligableCheckin: (student, eligable)=>
     if @session?
@@ -674,11 +722,38 @@ class FVSCardDataManager
       else if response.data?
         @enterSession response.data
 
+  submitLoadBoard: (date) =>
+    mDate = moment date, "MM/DD/YYYY"
+    @request
+      command: "load-weekend-board"
+      date: mDate.toDate()
+    , "GET", (response) =>
+      if not response.success and response.data?
+        @ui.showMessageDialog "Error", response.data
+      else if response.data?
+        @enterBoard response.data
+
+  submitCreateBoard: (date) =>
+    mDate = moment date, "MM/DD/YYYY"
+    @request
+      command: "create-weekend-board"
+      date: mDate.toDate()
+    , "GET", (response) =>
+      if not response.success and response.data?
+        console.log response.data
+        @ui.showMessageDialog "Error", response.data
+      else if response.data?
+        console.log response
+        @enterBoard response.data
+
   beginCreateSession: ->
-    @ui.showSessionInfoPopup("Create Session",@submitCreateSession)
+    @ui.showSessionInfoPopup "Create Session", @submitCreateSession
 
   beginFlipSessionStatus: ->
-    @ui.showConfirmDialog(@flipStateAndSubmit)
+    @ui.showConfirmDialog @flipStateAndSubmit
+
+  beginFlipBoardStatus: ->
+    @ui.showConfirmDialog @flipBoardStateAndSubmit
 
   beginLoadSession: ->
     @ui.showSessionInfoPopup "Load Session",@submitLoadSession
@@ -690,12 +765,13 @@ class FVSCardDataManager
     @ui.showBoardInfoPopup "Load Weekend Board", @submitLoadBoard
 
   beginExitSession: ->
-    @ui.showConfirmDialog(@exitSession)
+    @ui.showConfirmDialog @exitSession
+
+  beginExitBoard: ->
+    @ui.showConfirmDialog @exitBoard
 
   enterSession: (res) =>
-    console.log res
     @session = res.session
-    @ui.menuBar.enterSession res.session
     @createList("Session", [])
     toCheckin = @createList("To Checkin", [])
     toCheckin.setAllowRemovals true
@@ -709,6 +785,16 @@ class FVSCardDataManager
       @addToList "To Checkin", student, false
       @sessionSort student
     @ui.tabPane.screen.updateList()
+
+  enterBoard: (res) =>
+    @board = res
+    @ui.menuBar.enterWeekendBoard @board
+    @ui.studentList.enableActionButtons()
+
+  exitBoard: =>
+    @board = null
+    @ui.menuBar.exitWeekendBoard()
+    @ui.studentList.disableActionButtons()
 
   sessionSort: (student)=>
     if @session?
@@ -729,7 +815,6 @@ class FVSCardDataManager
     @removeList "Session"
     @removeList "To Checkin"
     @resetStudents()
-    @ui.menuBar.exitSession()
     @ui.tabPane.screen.updateList()
 
   addEligableToCheckin: (status) =>
@@ -751,6 +836,11 @@ class FVSCardDataManager
   sessionUpdate: (session) =>
     if @session? and @session.pub_id is session.pub_id
       @session.open = session.open
+      @ui.update()
+
+  boardUpdate: (board) =>
+    if @board? and @board.pub_id is board.pub_id
+      @board.open = board.open
       @ui.update()
 
   updateStudentStatus: (status) =>
@@ -778,7 +868,7 @@ class FVSCardDataManager
 
     constructor: (request, uiData, data) ->
       @fvsCardRequest = request
-      @state = SessionStatus.notInSession
+      @state = BoardStatus.notInBoard
 
       @ui = new FVSCardUI uiData
       @dataManager = new FVSCardDataManager @ui, data, request
@@ -796,9 +886,9 @@ class FVSCardDataManager
       @ui.studentList.screen.addDisplayList "Boarding", bList
       @dataManager.updateUi()
 
-      @ui.menuBar.exitSession()
+      @ui.menuBar.exitWeekendBoard()
       @ui.sideContainerRight.readerUnbound()
-      @ui.tabPane.screen.setDisplayList "All Students"
+      #@ui.tabPane.screen.setDisplayList "All Students"
 
 
   window.FVSCard =

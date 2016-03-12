@@ -1,6 +1,6 @@
 rand = require "generate-key"
 module.exports = (db,models) ->
-  db.define "checkin_session",
+  db.define "parietal",
     pub_id:
       type: "text"
     board_id:

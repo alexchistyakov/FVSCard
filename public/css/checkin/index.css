@@ -26,6 +26,7 @@ body {
   float: left;
   position: relative;
   width: 100%;
+  margin-top 5px;
 }
 .menubar-container .menubar-container-top .status-container {
   position: absolute;
@@ -33,6 +34,7 @@ body {
   bottom: 0;
   color: #fff;
   text-align: center;
+  margin-top: 25px;
   padding-bottom: 7px;
   height: 100%;
   font-size: 11px;
@@ -40,10 +42,11 @@ body {
   left: 50%;
   -webkit-transform: translate(-50%,-50%);
 }
-.menubar-container .menubar-container-top .status-container.action-switcher-container{
+.menubar-container .menubar-container-top .status-container .action-switcher-container{
   position: relative;
   width: 100%;
   float: left;
+  text-align: center;
 }
 .pressed{
   background: #851a00;
@@ -211,6 +214,7 @@ body {
   cursor: pointer;
 }
 .list-container .tabhandle .tab-container {
+
   position: absolute;
   height: 80%;
   bottom: 0;
@@ -227,7 +231,7 @@ ul.tabs {
   width: 100%;
   height: 20px;
 }
-ul.tabs>li.tab {
+ul.tabs>li.tab, ul.tabs>li.as-tab {
   float: left;
   padding-top: 5px;
   text-align: center;
@@ -236,10 +240,13 @@ ul.tabs>li.tab {
   color: #fff;
   font-size: 11px;
   box-sizing: border-box;
+  line-height: 7px;
   cursor: pointer;
 }
 ul.tabs>li.as-tab {
-
+  border-color: #9B1F00;
+  border-width: 0 1px 0 1px;
+  border-style: solid;
 }
 .active {
   background: #DC2E00;
