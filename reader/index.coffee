@@ -17,8 +17,8 @@ module.exports =
       reader = @boundReaders[i]
       if reader.id is id
         client = reader.user
-        if client.connected?
-          client.send "reader disconnected",
+        unless client.disconnected
+          client.emit "reader disconnected",
             id: id
         @boundReaders.splice i, 1
         return
@@ -26,7 +26,6 @@ module.exports =
       reader = @openReaders[i]
       if reader.id is id
         @openReaders.splice i,1
-        console.log @openReaders
         return
 
   findBoundById: (id) ->
@@ -78,6 +77,9 @@ module.exports =
   useTcp: (tcp) ->
     @tcp = tcp
 
+  useDB: (models) ->
+    @models = models
+
   init: ->
     unless @io?
       throw new Error "Dude, I need a socket.io to work"
@@ -107,38 +109,39 @@ module.exports =
 
   resetTrackAlive: (id) ->
     reader = @findReader id
-    console.log @openReaders
-    console.log @boundReaders
-    reader.waitTimeout = setTimeout =>
-      reader.socket.write
-        ping: "ping"
-      reader.pingTimeout = setTimeout =>
-        console.log "DICK"
-        @terminate reader.socket
-        reader.socket.end()
-      , @PING_TIMEOUT
-    , @WAIT_TIMEOUT
+    if not reader.waitTimeout? and not reader.pingTimeout?
+      reader.waitTimeout = setTimeout =>
+        reader.pingTimeout = setTimeout =>
+          @clearTimeouts id
+          @terminate id
+          reader.socket.end()
+        , @PING_TIMEOUT
+        reader.socket.write
+          ping: "ping"
+      , @WAIT_TIMEOUT
 
   clearTimeouts: (id) ->
     reader = @findReader id
-    clearTimeout reader.waitTimeout
-    clearTimeout reader.pingTimeout
+    if reader?
+      clearTimeout reader.waitTimeout
+      clearTimeout reader.pingTimeout
+      reader.waitTimeout = null
+      reader.pingTimeout = null
 
   requestBind: (user, id, callback) ->
     reader = @findOpenById id
-    console.log reader
     if reader?
+      @clearTimeouts id
       @openReaders.splice i, 1
       @boundReaders.push
         id: id
         user: user
         socket: reader.socket
-        waitTimeout: reader.waitTimeout
-        pingTimeout: reader.pingTimeout
       reader.socket.write
         bound: true
       callback user,true,
         id: id
+      @resetTrackAlive id
     else
       callback user,false, "Reader not found"
 
@@ -147,3 +150,35 @@ module.exports =
       success: success
       data: data
 
+  cardSwipe: (key, socket, data) ->
+    bound = @findBoundByReader socket
+    unless bound?
+      socket.write
+        success: false
+        message: "Reader not bound to client"
+      return
+
+    socket.write
+      success: true
+
+    @models.model("student").one
+      card_id: data.card_id
+    , (err, res) ->
+      console.log data.card_id
+      success = false
+      data = {}
+      if err?
+        data =
+          message: "Database error"
+          error: null
+      else if not res?
+        data =
+          message: "Student not found"
+          error: null
+      else
+        success = true
+        data =
+          student: res
+      bound.user.emit "card swipe",
+        success: success
+        data: data

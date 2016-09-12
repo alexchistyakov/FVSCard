@@ -1,38 +1,27 @@
 rand = require "generate-key"
 module.exports = (db,models) ->
-  users = db.define "student",
+  db.define "student_permissions",
     pub_id:
       type: "text"
-    nickname:
+    student_id:
       type: "text"
       required: true
-    lastname:
+    ride_with:
       type: "text"
       required: true
-    firstname:
+    drive_students:
+      type: "boolean"
+      required: true
+    towncar_cab:
+      type: "boolean"
+      required: true
+    stay_with:
       type: "text"
       required: true
-    year:
-      type: "text"
-      required: true
-    house:
-      type: "text"
-      reqiured: true
-    room:
-      type: "integer"
-    card_id:
-      type: "text"
-      required: true
-    phone_number:
-      type: "text"
   ,
     timestamp: true
     hooks:
       beforeCreate: ->
         @pub_id = rand.generateKey Math.floor(Math.random() * 15) + 15
-      beforeSave: ->
-        @firstname = @firstname.capitalize()
-        @nickname = @nickname.capitalize()
-        @lastname  = @lastname.capitalize()
     validations:
       pub_id: db.enforce.unique()

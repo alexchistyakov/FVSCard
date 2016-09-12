@@ -1,8 +1,11 @@
 rand = require "generate-key"
 module.exports = (db,models) ->
-  db.define "checkin_session",
+  db.define "checkout",
     pub_id:
       type: "text"
+    board_id:
+      type: "text"
+      required: true
     student_id:
       type: "text"
       required: true
@@ -11,6 +14,18 @@ module.exports = (db,models) ->
       required: true
     date_return:
       type: "date"
+    time_leave:
+      type: "text"
+      required: true
+    time_return:
+      type: "text"
+      required: true
+    location:
+      type: "text"
+      required: true
+    transport:
+      type: "text"
+      required: true
     type:
       type: "enum"
       values: ["DX","WX"]

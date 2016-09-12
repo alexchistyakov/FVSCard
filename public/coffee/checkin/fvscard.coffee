@@ -8,7 +8,7 @@ StudentStatus =
     name: "missing"
     id: 1
     bgcolor: "#FF3300"
-    text: "Missing"
+    text: "Absent"
   dx:
     name: "dx"
     id: 2
@@ -20,6 +20,17 @@ StudentStatus =
     bgcolor: "#0099FF"
     text: "WX"
 
+OpenClosedStatus = [
+      name: "open"
+      id: 0
+      bgcolor: "#33CC33"
+      text: "Open"
+    ,
+      name: "closed"
+      id: 1
+      bgcolor: "#FF3300"
+      text: "Closed"
+    ]
 BoardStatus =
   notInBoard:
     id: 0
@@ -50,33 +61,56 @@ BoardStatus =
 class FVSCardUI
   menuBarElementSelector: ".menubar-container"
 
-  constructor: (uiData) ->
+  constructor: (uiData, dataManager) ->
+    @dataManager = dataManager
     @studentListItemHTML = uiData.studentitem
     @studentSideListItemHTML = uiData.studentitemmini
+    @parietalItem = uiData.parietalitem
+    @dxwxItem = uiData.dxwxitem
+    @studentIconItem = uiData.studenticonitem
+    @studentplaceholder = uiData.studentplaceholder
     @popupSessionInfoHTML = uiData.popup_createsession
     @popupConfirmDialogHTML = uiData.popup_closesession
     @popupMessageDialogHTML = uiData.popup_message
     @popupWeekendBoardInfoHTML = uiData.popup_loadboard
-    console.log uiData
 
     @sideContainerRight = new FVSSideContainer @
-    @tabPane = new FVSBottomTabPane @
+    @tabPane = new FVSBottomTabPane @, uiData.checkin_manipulator
     @menuBar = new FVSTopMenuBar @tabPane
     @studentList = new FVSStudentListPane null
     screen = new FVSSideScreen @studentList, @
-    screen.assignSearchbar new FVSStudentSearchBar null, @
     @studentList.setScreen screen
-    @tabPane.setScreen screen
 
   updateScreens: ->
     @studentList.triggerUpdate()
-    @tabPane.update()
+    @tabPane.triggerUpdate()
+
+  createStudentIconView: (student) ->
+    $element = $ @studentIconItem
+    $element.find(".student-photo").attr "src", if student.photoSource? then student.photoSource else "/img/missing.png"
+    $element.find(".student-name").text "#{student.firstName} #{student.lastName}"
+    $element.find(".student-dorm").text student.dorm
+    $element
+
+  postAction: (action) ->
+    @listAction = action
+    @studentList.screen.setActionButtonVisible true
+    @studentList.triggerUpdate()
+
+  clearAction: =>
+    @listAction = null
+    @studentList.screen.setActionButtonVisible false
+    @studentList.triggerUpdate()
 
   generateStatusSwitchView: (student) ->
-    $statusSwitcher = $ "<div class=\"status-switcher-container\">"
     statuses = []
     for k,v of StudentStatus
       statuses.push v
+    @generateSwitchPill student, statuses, (student, status) ->
+      window.FVSCard.dataManager.sendUpdateStudentStatus student, status
+
+  generateSwitchPill: (object, statuses, action) ->
+    $statusSwitcher = $ "<div class=\"status-switcher-container\">"
     for i in [0...statuses.length]
       do (i) =>
         status = statuses[i]
@@ -87,13 +121,13 @@ class FVSCardUI
           styling += "border-radius: 0 10px 10px 0;"
         $element = $ "<div class=\"status-switcher\" style=\"#{styling}\">#{status.text}</div>"
         $element.click (event)=>
-          window.FVSCard.dataManager.sendUpdateStudentStatus student, status
+          action object, status
         $statusSwitcher.append $element
     $statusSwitcher
 
   update: ->
     @menuBar.update()
-    @tabPane.update()
+    @tabPane.triggerUpdate()
     @studentList.triggerUpdate()
 
   showConfirmDialog: (callback)->
@@ -112,10 +146,20 @@ class FVSCardUI
     popup = new FVSPopupWeekendBoardDataInput title, @popupWeekendBoardInfoHTML, callback
     popup.render()
 
+  showTimepickerPopup: (title, callback) ->
+    popup = new FVSPopupTimepickerDialog title, @popupWeekendBoardInfoHTML, callback
+    popup.render()
+
+  createPermissionsHint: (student) ->
+    $element = $ "<table/>"
+    #TODO
+
+
 class FVSSideContainer
   readerContainerSelector: ".side-container-right .reader-container"
   readerMessageSelector: ".side-container-right .reader-container .reader-info-container .reader-message"
   readerActionContainerSelector: ".side-container-right .reader-container .reader-info-container .reader-action-container"
+  readerIconSelector: ".reader-icon .reader-image"
 
   inputHtml: "<input class=\"reader-input\" id=\"reader-input\" placeholder=\"Enter Reader ID\">"
   boundHtml: "<div class=\"reader-status\" style=\"background:#0F0;\">Reader Bound</div>"
@@ -129,9 +173,11 @@ class FVSSideContainer
     @bound = true
     $readerMessage = $ @readerMessageSelector
     $actionContainer = $ @readerActionContainerSelector
+    $readerIcon = $ @readerIconSelector
     $readerMessage.css "color", "#000"
 
     $readerMessage.text "You are now bound to a reader and will recieve updates."
+
     $actionContainer.empty()
     $actionContainer.append $ @boundHtml
 
@@ -139,6 +185,7 @@ class FVSSideContainer
     @bound = false
     $readerMessage = $ @readerMessageSelector
     $actionContainer = $ @readerActionContainerSelector
+    $readerIcon = $ @readerIconSelector
     $readerMessage.css "color", "#000"
 
     $readerMessage.text "No reader is bound. Please input a reader ID bellow and press enter."
@@ -166,10 +213,9 @@ class FVSTopMenuBar
     @currentIndex = 0
     $actionSwitcher = $(@actionSwitcherSelector)
     $actionSwitcher.find("li").each (index, element) =>
-      console.log element
       $(element).click =>
-        @currentIndex = index
         @tabPane.setScreen index
+        @currentIndex = index
         @update()
 
   update: ->
@@ -213,25 +259,64 @@ class FVSTopMenuBar
     @update()
 
 class FVSBottomTabPane
-  tabHandleSelector: ".main-container .list-container .tabhandle .tab-container"
+  tabHandleSelector: "#tab-container"
   listContainerSelector: ".main-container .list-container .bottom-container .student-list"
   tabScreenMap: []
+  tabScreenMapCache: []
+  currentScreenIndex: 0
 
-  constructor: (ui) ->
-    @tabPaneSelector = ".list-container"
-    @tabHandleSelector = @tabPaneSelector+" .tabhandle .tab-container"
+  constructor: (ui, checkinManipulator) ->
     @ui = ui
+    @checkinManipulator = checkinManipulator
+    @resetScreens()
+
+  resetScreens: =>
+    @tabScreenMap[0] = new FVSParietalScreen @, @ui
+    @tabScreenMap[1] = new FVSCheckinScreen @, @ui, @checkinManipulator
+    @tabScreenMap[2] = new FVSCheckoutScreen @, @ui
 
   setScreen: (screen) ->
+    @currentScreenIndex = screen
+    if @screen?
+      @saveCurrentScreenState()
+      @screen.unrender()
+      @screen.disableSearch()
     @screen = @tabScreenMap[screen]
+    if @screen?
+      if not @screen.loaded then @screen.load()
+      @screen.enableSearch()
+    if @tabScreenMapCache[screen]?
+      @loadScreenState screen
+      @screen.updateScreenData()
+      @screen.renderTabHandle $ @tabHandleSelector
+    else
+      @triggerUpdate()
 
-  update: ->
-    @screen.update() if @screen?
+  saveCurrentScreenState: ->
+    @tabScreenMapCache[@currentScreenIndex] = $(".student-list").html()
+
+  loadScreenState: (slot) ->
+    $(".student-list").html @tabScreenMapCache[slot]
+
+  triggerUpdate: ->
+    @render()
 
   render: ->
+    @updateListData()
+    $(@tabHandleSelector).empty()
     if @screen?
       @screen.renderTabHandle $ @tabHandleSelector
+      @screen.updateScreenData()
+
+  updateListData: ->
+    $(@listContainerSelector).empty()
+    if @screen?
       @screen.renderList $ @listContainerSelector
+
+  reset: ->
+    @screen.unrender()
+    @screen.unload()
+    @screen = null
 
 class FVSStudentListPane
 
@@ -246,38 +331,56 @@ class FVSStudentListPane
     @screen = screen
     if @screen?
       $(@titleSelector).text @screen.name
+      if not screen.loaded then @screen.load()
 
-  enableActionButtons: ->
+  addActionButton: ($button)->
+    @screen.addButton $button
 
-  disableActionButtons: ->
+  clearActionButtons: ->
+    @screen.clearButtons()
 
   triggerUpdate: ->
     @render()
 
   render: ->
-    $studentList = $ @listSelector
+    @updateListData()
     $tabHandle = $ @tabHandleSelector
-
     @screen.renderTabHandle $tabHandle
+
+  updateListData: ->
+    $studentList = $ @listSelector
     @screen.renderList $studentList
 
 class FVSScreen
-  tabListMap: []
-  currentIndex: 0
-
   constructor: (name,parent, ui) ->
     @name = name
     @parent = parent
     @ui = ui
     @searching = false
+    @tabListMap = []
+    @currentIndex = 0
+
+    @tabClass = "screen-tab"
+    @tabClassActive = "screen-tab-active"
+    @tabClassOff = "screen-tab-off"
 
   assignSearchbar: (searchbar, searchBarSelector) ->
     @searchBar = searchbar
-    $searchBar = $(searchBarSelector)
-    $searchBar.on "input", =>
-      @searchBar.onType $searchBar.val()
-      @onSearchInput $searchBar.val()
-      @parent.triggerUpdate()
+    @searchBarSelector = searchBarSelector
+    @enableSearch()
+
+  enableSearch: ->
+    $searchBar = $(@searchBarSelector)
+    $searchBar.on "input", (event)=>
+      val = $(event.target).val()
+      @searchBar.onType val
+      @onSearchInput val
+      @parent.updateListData()
+
+  disableSearch: ->
+    console.log @searchBarSelector
+    $searchBar = $(@searchBarSelector)
+    $searchBar.off "input"
 
   onSearchInput: (input) ->
     if input.length != 0
@@ -292,9 +395,12 @@ class FVSScreen
         @searchBar.setList @tabListMap[@currentIndex]
         return @currentIndex
 
-  addDisplayList: (tab,list) ->
+  addDisplayList: (list) ->
     @tabListMap.push list
     list
+
+  clearDisplayLists: ->
+    @tabListMap = []
 
   update: ->
     @parent.triggerUpdate()
@@ -305,71 +411,453 @@ class FVSScreen
     toRender = if @searching then @searchBar.searchList else @tabListMap[@currentIndex]
     $tabPaneList.append toRender.render()
 
+  updateScreenData: ->
+
   renderTabHandle: ($tabHandle)->
     $tabHandle.empty()
     for item in @tabListMap
         do (item) =>
-          $element = $ "<li class=\"tab\">#{item.name}</li>"
+          $element = $ "<li class=\"#{@tabClass} #{@tabClassOff}\">#{item.name}</li>"
           if @tabListMap[@currentIndex] is item
-            $element.addClass("active")
+            $element.removeClass @tabClassOff
+            $element.addClass @tabClassActive
           $element.click =>
             @setDisplayList item.name
             @update()
           $tabHandle.append $element
+
+  load: ->
+    @loaded = true
+    @enableSearch()
+    unless @loadLists?
+      return
+    for listName in @loadLists
+      list = FVSCard.dataManager.findList(listName)
+      if list?
+        @addDisplayList list
+      else
+        @addDisplayList FVSCard.dataManager.createList listName, [], @listClass
+
+  unrender: ->
+
+  unload: ->
+    @loaded = false
+    @disableSearch()
+    @clearDisplayLists()
+
+  createButtonView: (id)->
+    $element = $ "<div></div>"
+    $element.text "+"
+    $element.addClass "create-button"
+    $element.addClass "createbutton"
+    $element.attr "id", id
+    $element
 
 class FVSSideScreen extends FVSScreen
 
   constructor: (tabPane, ui) ->
     super "Students", tabPane, ui
     @assignSearchbar new FVSStudentSearchBar(@tabListMap[@currentIndex], @ui), "#student-searchbar"
+    @tabClass = "tab"
+    @tabClassActive = "active"
+    @tabClassOff = ""
+    @buttons = []
 
-  addDisplayList: (tab, list) ->
+  addDisplayList: (list) ->
     list.mini = true
     @tabListMap.push list
     list
 
+  load: ->
+    super()
+
+  addButton: (button)->
+    @buttons.push button
+
+  setLeavePermissionHintEnabled: (enabled) ->
+    @leavePermissionHintEnabled = enabled
+
+  clearButtons: ->
+    @buttons = []
+
+  setActionButtonVisible: (visible) ->
+    @searchBar.searchList.setActionButtonEnabled visible
+    @tabListMap[@currentIndex].setActionButtonEnabled visible
+
+  renderList: ($listSelector) ->
+    @searchBar.searchList.clearButtons()
+    @tabListMap[@currentIndex].clearButtons()
+
+    @searchBar.searchList.addButtons @buttons
+    @tabListMap[@currentIndex].addButtons @buttons
+
+    super $listSelector
+
 class FVSCheckinScreen extends FVSScreen
 
-  constructor: (tabPane, ui) ->
+  constructor: (tabPane, ui, manipulatorHTML) ->
     super "Checkin",tabPane, ui
-    @assignSearchbar new FVSStudentSearchBar null, @ui
+    @assignSearchbar (new FVSStudentSearchBar @tabListMap[@currentIndex], @ui), "#main-searchbar"
+    @manipulatorHTML = manipulatorHTML
+    @loadLists = ["Checked In", "Absent"]
+    @listClass = FVSStudentList
 
   renderList: ($tabPaneList) ->
+    $tabPaneList.empty()
     unless FVSCard.dataManager.session?
-      $tabHandle.append "<div class=\"todo\">No Meal Check Currently Loaded</div>"
+      $tabPaneList.append "<div class=\"screen-label\">No Meal Check Currently Loaded</div>"
     else
       super $tabPaneList
 
-class FVSStudentSearchBar
+  updateScreenData: ->
+    $container = $ ".side-container-right"
+    unless $container.has(".session-manipulator").length
+      $container.append $ @manipulatorHTML
+      $status = $("#status-manipulator")
+      $(".session-manipulator-create").click FVSCard.dataManager.beginCreateSession
+      $(".session-manipulator-load").click ->
+        FVSCard.dataManager.submitLoadSession null,null,$(".session-manipulator-select").val()
+      FVSCard.dataManager.getSessionList @populateList
+    $status = $("#status-manipulator")
+    $status.off "click"
+    if FVSCard.dataManager.session?
+      open = FVSCard.dataManager.session.open
+      $status.css "background", if open then "#7AFF95" else "#FF7A7A"
+      $status.text if open then "Open" else "Closed"
+      $status.click FVSCard.dataManager.beginFlipSessionStatus
+      @tabListMap[1].setAllowRemovals not open
+      @ui.clearAction()
+      if @currentIndex is 1 and not open
+        @ui.postAction (student) =>
+          FVSCard.dataManager.submitEligableCheckin student, true
+    else
+      $status.css "background", "#ccc"
+      $status.text "No Session"
 
-  constructor: (studentList, ui) ->
+    $manipulator = $ ".session-manipulator"
+    unless $manipulator.is ":visible"
+      $manipulator.show()
+
+  unrender: ->
+    $manipulator = $ ".session-manipulator"
+    $manipulator.hide()
+
+  renderTabHandle: ($tabHandle) ->
+    super $tabHandle
+    unless FVSCard.dataManager.session?
+      $tabHandle.find(".screen-tab").each (index, element)->
+        $(element).addClass "tab-disabled"
+
+        $(element).unbind "click"
+
+  populateList: (data) =>
+    $(".session-manipulator-select").empty()
+    for session in data
+      @addSessionEntry session
+
+  addSessionEntry: (session) =>
+    unless session.type is "Dorm"
+      text = "#{moment(session.date).format "MMMM Do, dddd"} - #{session.type}"
+    else
+      text = "#{moment(session.date).format "MMMM Do, dddd"} - #{session.dorm}"
+    element = $("<option></option>").val(session.pub_id).html(text)
+    $(".session-manipulator-select").append element
+
+class FVSCheckoutScreen extends FVSScreen
+
+  constructor: (tabPane, ui) ->
+    super "Checkouts", tabPane, ui
+    @assignSearchbar (new FVSCheckoutSearchbar @tabListMap[@currentIndex], ui), "#main-searchbar"
+    @loadLists = ["Off Campus", "Returned"]
+    @listClass = FVSCheckoutList
+    @inited = false
+
+  load: ->
+    super()
+    FVSCard.dataManager.submitLoadCheckouts()
+
+  renderList: ($listSelector) ->
+    super $listSelector
+    $pView = @createCheckoutMakeView()
+    @wipCheckout.date = moment()
+    $listSelector.prepend $pView
+    $pView.hide()
+    @updateCurrentCheckoutList()
+
+  updateScreenData: ->
+    unless @inited
+      if @currentIndex is 0
+        $element = @createButtonView "checkout-create-button"
+        $element.click =>
+          @flipCreateAction true
+        $("#main-searchbar").css "width", "90%"
+        $(".bottom-container .bottom-handle").append $element
+        @inited = true
+    unless @currentIndex is 0
+      $("#checkout-create-button").hide()
+      $("#main-searchbar").css "width", "100%"
+    else
+      $("#checkout-create-button").show()
+      $("#main-searchbar").css "width", "90%"
+
+  createCheckoutMakeView: =>
+    @wipCheckout = new FVSCheckout null, null, moment().format("h:mm:ss a"), null, moment().format("MMMM Do YYYY")
+    $element = $ @ui.dxwxItem
+    $element.attr "id", "dxwx-create"
+    $element.find(".c-student .button-container")
+    $element.click ->
+      $element.attr "tabindex", -1
+    $element.keyup (event) =>
+      if event.keyCode is 13
+        @finalizeWipCheckout()
+      if event.keyCode is 27
+        @checkoutList.clearList()
+        @updateCurrentCheckoutList()
+        @dumpWipCheckout()
+
+    @checkoutList = new FVSStudentList @ui, "Current Checkout"
+    @checkoutList.mini = true
+    @checkoutList.buttonless = true
+
+    $input = $ "<input class=\"fancy-input\">"
+
+    $typeSelector = $ "<select/>"
+    $typeSelector.attr "id", "dxwx-type-selector"
+    $typeSelector.attr "name", "dxwx-type-selector"
+    $item = $("<option/>").text("DX")
+    $typeSelector.append $item
+    $typeSelector.append $item.clone().text "WX"
+    $element.find(".dxwx-type").append $typeSelector
+
+    $element.find(".dxwx-time-leave").append $input.clone().timepicker()
+    $element.find(".dxwx-time-return").append $input.clone().timepicker()
+    $element.find(".dxwx-date-leave").append $input.clone().datepicker()
+    $element.find(".dxwx-date-return").append $input.clone().datepicker()
+    $element.find(".dxwx-location").append $input.clone()
+    $element.find(".dxwx-transport").append $input.clone()
+
+    $element.find(".status").css "background", "#ccc"
+    $element.find(".status").text "Working"
+    $element
+
+  dumpWipCheckout: ->
+    @wipCheckout = null
+    @flipCreateAction false
+
+  finalizeWipCheckout: ->
+    @wipCheckout.time_leave =  $(".dxwx-time-leave .fancy-input").val()
+    @wipCheckout.time_return = $(".dxwx-time-return .fancy-input").val()
+    @wipCheckout.date_leave = $(".dxwx-date-leave .fancy-input").val()
+    @wipCheckout.date_return = $(".dxwx-date-return .fancy-input").val()
+    @wipCheckout.location = $(".dxwx-location .fancy-input").val()
+    @wipCheckout.transport = $(".dxwx-transport .fancy-input").val()
+    @wipCheckout.type = $("#dxwx-type-selector").val()
+    @wipCheckout.open = true
+    for item in @checkoutList.items
+      @wipCheckout.student = item
+      FVSCard.dataManager.submitCreateCheckout @wipCheckout
+    @dumpWipCheckout()
+
+  flipCreateAction: (creating) ->
+    $createButton = $("#checkout-create-button")
+    $wipCheckoutView = $("#dxwx-create")
+    if not creating
+      $("#main-searchbar").css "width", "90%"
+      $createButton.show()
+      $wipCheckoutView.hide()
+      @ui.clearAction()
+    else
+      $("#main-searchbar").css "width", "100%"
+      $wipCheckoutView.show()
+      $createButton.hide()
+      @ui.postAction (student) =>
+        @checkoutList.addItemToList student
+        @updateCurrentCheckoutList()
+
+  updateCurrentCheckoutList: ->
+    $element = $ "#dxwx-create .c-student"
+    $element.empty()
+    $element.append @checkoutList.render()
+
+  unrender: ->
+    @ui.clearAction()
+    $("#main-searchbar").css "width", "100%"
+    $("#checkout-create-button").remove()
+    @inited = false
+
+class FVSParietalScreen extends FVSScreen
+
+  constructor: (tabPane, ui) ->
+    super "Parietals",tabPane,ui
+    @assignSearchbar (new FVSParietalSearchBar @tabListMap[@currentIndex], ui), "#main-searchbar"
+    @loadLists = ["Ongoing","Past"]
+    @listClass = FVSParietalList
+    @inited = false
+
+  load: ->
+    super()
+    FVSCard.dataManager.submitLoadParietals()
+
+  renderList: ($listSelector)->
+    super $listSelector
+    $pView = @createParietalMakeView()
+    @wipParietal.date = moment()
+    $listSelector.prepend $pView
+    $pView.hide()
+
+  updateScreenData: ->
+    unless @inited
+      if @currentIndex is 0
+        $element = @createButtonView("parietal-create-button")
+        $element.click =>
+          @flipCreateAction true
+        $("#main-searchbar").css "width", "90%"
+        $(".bottom-container .bottom-handle").append $element
+        @inited = true
+    unless @currentIndex is 0
+      $("#parietal-create-button").hide()
+    else
+      $("#parietal-create-button").show()
+
+  unrender: ->
+    $("#main-searchbar").css "width", "100%"
+    $("#parietal-create-button").remove()
+    @inited = false
+
+  createParietalMakeView: =>
+    @wipParietal = new FVSParietal null, null, moment().format("h:mm:ss a"), null, moment().format("MMMM Do YYYY")
+    $element = $ @ui.parietalItem
+    $element.attr "id", "p-create"
+    $element.click ->
+      $element.attr "tabindex", -1
+    $element.keyup (event) =>
+      if event.keyCode is 13
+        @finalizeWipParietal()
+      if event.keyCode is 27
+        @dumpWipParietal()
+
+    $placeholderHost = $ @ui.studentplaceholder
+    $placeholderGuest = $ @ui.studentplaceholder
+    $placeholderHost.click =>
+      $placeholderHost.attr "tabindex", -1
+      @ui.postAction (student)=>
+        @wipParietal.host = student
+        $("#p-create .student-to").empty().append @ui.createStudentIconView student
+        $placeholderHost.removeAttr "tabindex"
+    $placeholderHost.focusout =>
+      setTimeout @ui.clearAction, 250
+    $placeholderGuest.click =>
+      $placeholderGuest.attr "tabindex", -1
+      @ui.postAction (student)=>
+        @wipParietal.guest = student
+        $("#p-create .student-going").empty().append @ui.createStudentIconView student
+        $placeholderGuest.removeAttr "tabindex"
+    $placeholderGuest.focusout =>
+      setTimeout @ui.clearAction, 250
+
+    $element.find(".student-going").append $placeholderGuest
+    $element.find(".student-to").append $placeholderHost
+    $input = $ "<input class=\"fancy-input\">"
+    $input.timepicker()
+
+    $element.find(".p-time-start").append $input
+    $element.find(".p-time-end .float-label").append $ "<span style=\"font-weight: italic;\"> Ongoing</span>"
+
+    $element.find(".status").css "background", "#ccc"
+    $element.find(".status").text "Working"
+    $element
+
+  finalizeWipParietal: ->
+    @wipParietal.timeIn = $(".p-time-start .fancy-input").val()
+    @wipParietal.date = moment()
+    @wipParietal.open = true
+    window.FVSCard.dataManager.submitCreateParietal @wipParietal
+    @wipParietal = null
+    @parent.updateListData()
+    @dumpWipParietal()
+
+  dumpWipParietal: ->
+    @wipParietal = null
+    @flipCreateAction false
+    @clearPCreate()
+
+  clearPCreate: ->
+    #TODO
+    @parent.triggerUpdate()
+
+  flipCreateAction: (creating) ->
+    $createButton = $("#parietal-create-button")
+    $wipParietalButton = $("#p-create")
+    if not creating
+      $("#main-searchbar").css "width", "90%"
+      $createButton.show()
+      $wipParietalButton.hide()
+    else
+      $("#main-searchbar").css "width", "100%"
+      $wipParietalButton.show()
+      $createButton.hide()
+
+class FVSSearchBar
+
+  constructor: (list, ui, clazz) ->
     @tags = []
-    @studentList = if studentList? then studentList else new FVSStudentList @ui, ""
     @ui = ui
-    @searchList = new FVSStudentList ui,""
-    if studentList?
-      @searchList.mini = studentList.mini
-    @regenerateTags()
+    @searchList = new clazz ui, ""
+    if list? then @setList(list) else @setList(new clazz @ui, "")
 
-  setList: (students) ->
-    @studentList = students
-    @searchList.setAllowRemovals @studentList.allowRemovals
-    @searchList.onRemove = (student) =>
-      @studentList.onRemove student
-      @studentList.removeStudentFromList student
-    @searchList.mini = @studentList.mini
+  setList: (list) ->
+    @list = list
+    @searchList.setAllowRemovals @list.allowRemovals
+    @searchList.onRemove = (item) =>
+      @list.onRemove item
+      @list.removeItemFromList student
     @regenerateTags()
 
   regenerateTags: ->
-    @tags = []
-    for student in @studentList.students
-      @tags.push student.firstName+" "+student.lastName
 
   onType: (text) ->
     @searchList.clearList()
     for i in [0...@tags.length]
-      if @tags[i].toLowerCase().includes text.toLowerCase()
-        @searchList.addStudentToList @studentList.students[i]
+      for j in [0...@tags[i].length]
+        if @tags[i][j].toLowerCase().startsWith text.toLowerCase()
+          @searchList.addItemToList @list.items[i]
+          break
+
+class FVSCheckoutSearchbar extends FVSSearchBar
+
+  constructor: (list, ui) ->
+    super list, ui, FVSCheckoutList
+
+  regenerateTages: ->
+    @tags = []
+    for item in @list.items
+      @tags.push [item.location, item.transport, item.student.firstName, item.student.lastName]
+
+class FVSStudentSearchBar extends FVSSearchBar
+
+  constructor: (studentList, ui) ->
+    super studentList, ui, FVSStudentList
+    if studentList?
+      @searchList.mini = studentList.mini
+
+  setList: (students) ->
+    super students
+    @searchList.mini = @list.mini
+
+  regenerateTags: ->
+    @tags = []
+    for student in @list.items
+      @tags.push [student.firstName, student.lastName]
+
+class FVSParietalSearchBar extends FVSSearchBar
+
+  constructor: (list, ui) ->
+    super list, ui, FVSParietalList
+
+  regenerateTags: ->
+    @tags = []
+    for item in @list.items
+      @tags.push [item.host.firstName, item.host.lastName, item.guest.firstName, item.guest.lastName, item.guest.dorm, item.host.dorm]
 
 class FVSPopup
   overlay: "<div class=\"popup-overlay\"></div>"
@@ -380,7 +868,6 @@ class FVSPopup
     @baseHTML = baseHTML
 
   element: ->
-    console.log @baseHTML
     $element = $(@baseHTML)
     $element.find(".popup-title").text @title
     $element.find(".popup-button-container .ok-button").click @submit
@@ -398,6 +885,24 @@ class FVSPopup
     $(".popup").remove()
     $(".popup-overlay").remove()
 
+class FVSPopupTimepickerDialog extends FVSPopup
+  datePickerSelector: "#createboard-datepicker"
+
+  constructor: (title, baseHTML, callback) ->
+    super baseHTML, title
+    @callback = callback
+
+  element: ->
+    $element = super()
+    $element.find(@datePickerSelector).timepicker()
+    $element
+
+  submit: =>
+    time = $(@datePickerSelector).val()
+    @dump()
+
+    @callback time
+
 class FVSPopupMessageDialog extends FVSPopup
 
   constructor: (title, message, baseHTML) ->
@@ -409,7 +914,6 @@ class FVSPopupMessageDialog extends FVSPopup
     $element = super()
     $element.find(".popup-button-container .cancel-button").remove()
     $element.find(".popup-content").text @message
-    console.log $element
     $element
 
 class FVSPopupSessionDataInput extends FVSPopup
@@ -423,18 +927,32 @@ class FVSPopupSessionDataInput extends FVSPopup
   element: ->
     $element = super()
     $element.find(@typePickerSelector).buttonset()
+    $element.find("#dorm-select").hide()
+    $element.find("#session-name").hide()
+    $element.find(".radio-buttons").click ->
+      $e = $(".createsession-typeselector :radio:checked")
+      $("#dorm-select").hide()
+      $("#session-name").hide()
+      if $e.attr("id") is "radio3"
+        $("#dorm-select").show()
+      else if $e.attr("id") is "radio4"
+        $("#session-name").show()
     $element.find(@datePickerSelector).datepicker()
     $element
 
   submit: =>
     selected = $('input[name=radio]:checked').attr('id')
-    console.log selected
     tod = $('label[for="'+selected+'"]').text()
-    console.log tod
     date = $(@datePickerSelector).val()
+    custom = false
+    if tod is "Dorm"
+      dorm = $("#dorm-select").val()
+    else if tod is "Custom"
+      custom = true
+      tod = $("#session-name").val()
     @dump()
 
-    @callback tod,date
+    @callback tod,custom,date,dorm
 
 class FVSPopupWeekendBoardDataInput extends FVSPopup
   datePickerSelector: "#createboard-datepicker"
@@ -487,46 +1005,220 @@ class FVSStudent
       if status.id is id
         @status = status
 
-class FVSStudentList
-  studentListSelector: ".list-container .student-list"
+class FVSCheckout
+  constructor: (student, date_leave, date_return, time_leave, time_return, location, transport, type, pub_id, open) ->
+    @student = student
+    @date_leave = date_leave
+    @date_return = date_return
+    @time_leave = time_leave
+    @time_return = time_return
+    @location = location
+    @transport = transport
+    @type = type
+    @pub_id = pub_id
+    @open = open
 
+  @parse: (checkout) ->
+    res = new FVSCheckout null, checkout.date_leave, checkout.date_return, checkout.time_leave, checkout.time_return, checkout.location, checkout.transport, checkout.type, checkout.pub_id, checkout.open
+    res.student = FVSCard.dataManager.findStudent checkout.student_id
+    res
+
+class FVSParietal
+
+  constructor: (guest, host, timeIn, timeOut, date) ->
+    @guest = guest
+    @host = host
+    @timeIn = timeIn
+    @timeOut = timeOut
+    @date = date
+
+    @open = true
+
+  @parse: (object) ->
+    res = new FVSParietal null,null,null,null,null
+    res.pub_id = object.pub_id
+    res.guest = FVSCard.dataManager.findStudent object.visitor_id
+    res.host = FVSCard.dataManager.findStudent object.host_id
+    res.timeIn = object.time_start
+    res.timeOut = object.time_end
+    res.date = object.date
+
+    res.open = object.open
+    res
+
+class FVSList
   constructor: (ui, name) ->
     @ui = ui
     @name = name
-    @students = []
+    @items = []
     @allowRemovals = false
     @mini = false
 
-  addAll: (students) ->
-    for student in students
-      @addStudentToList student
+  addAll: (items) ->
+    for item in items
+      @addItemToList item
+
+  findItem: (item) ->
+    for i in @items
+      return i if i is item
 
   setAllowRemovals: (allowRemovals) ->
     @allowRemovals = allowRemovals
 
-  addStudentToList: (student) ->
-    if student instanceof FVSStudent
-      @students.push student
+  addItemToList: (item) ->
+    @items.push item
 
-  pushStudentToList: (student) ->
-    if student instanceof FVSStudent
-      @students.unshift student
+  pushItemToList: (item) ->
+    @items.unshift item
 
-  removeStudentFromList: (student) ->
-    for i in [0...@students.length]
-      if student instanceof String
-        if @students[i].firstName is student or @students[i].lastName is student
-          @students.splice i, 1
-      else
-        if @students[i] is student
-          @students.splice i, 1
+  removeItemFromList: (item) ->
+    for i in [0...@items.length]
+      if item is @items[i]
+        @items.splice i,1
 
   clearList: ->
-    @students = []
+    @items = []
+
+  render: ->
+
+
+class FVSParietalList extends FVSList
+
+  constructor: (ui, name) ->
+    super ui, name
+
+  removeItemFromList: (item) ->
+    for i in [0...@items.length]
+      if @items[i]? and item.pub_id is @items[i].pub_id
+        @items.splice i,1
+
+  findItem: (id) ->
+    for i in @items
+      if i.pub_id is id
+        return i
 
   render: ->
     renderedList = []
-    for student in @students
+    for parietal in @items
+      do (parietal) =>
+        currentStatus = if parietal.open then OpenClosedStatus[0] else OpenClosedStatus[1]
+        itemTemplate = $ @ui.parietalItem
+        itemTemplate.click =>
+          itemTemplate.attr "tabindex", "-1"
+        itemTemplate.keydown (event) =>
+          event.preventDefault()
+          if event.which is 8
+            @ui.showConfirmDialog ->
+              FVSCard.dataManager.submitRemoveParietal parietal
+        itemTemplate.find(".student-going").append @ui.createStudentIconView parietal.guest
+        itemTemplate.find(".student-to").append @ui.createStudentIconView parietal.host
+        itemTemplate.find(".p-time-start .float-label").append $ "<span style=\"font-weight: normal;\">#{parietal.timeIn}</span>"
+        itemTemplate.find(".p-time-end .float-label").append $ "<span style=\"font-weight: normal;\">#{if parietal.timeOut? then parietal.timeOut else "Ongoing"}</span>"
+        itemTemplate.find(".p-date").text moment(parietal.date).format("l")
+
+        $statusView = itemTemplate.find(".status")
+        $statusView.click (event)=>
+          $(event.target).replaceWith @ui.generateSwitchPill parietal, OpenClosedStatus, (object, status) =>
+            if status.id is 1
+              FVSCard.ui.showTimepickerPopup "Select a time", (time)=>
+                FVSCard.dataManager.submitUpdateParietal parietal.pub_id, status, time
+
+            else
+              FVSCard.dataManager.submitUpdateParietal parietal.pub_id, status
+
+        $statusView
+          .text(currentStatus.text)
+          .css("background", currentStatus.bgcolor)
+        itemTemplate.find(".p-status-container").append $statusView
+        renderedList.push itemTemplate
+    renderedList
+
+class FVSCheckoutList extends FVSList
+
+  constructor: (ui,name) ->
+    super ui,name
+
+  removeItemFromList: (item) ->
+    for i in [0...@items.length]
+      if @items[i]? and @items[i].pub_id is item.pub_id
+        @items.splice i, 1
+
+  findItem: (id) ->
+    for i in @items
+      if i.pub_id is id
+        return i
+
+  render: ->
+    renderedList = []
+    for item in @items
+      do (item) =>
+        currentStatus = if item.open then OpenClosedStatus[0] else OpenClosedStatus[1]
+        itemTemplate = $ @ui.dxwxItem
+        itemTemplate.click =>
+          itemTemplate.attr "tabindex", "-1"
+        itemTemplate.keydown (event) =>
+          event.preventDefault()
+          if event.which is 8
+            @ui.showConfirmDialog ->
+              FVSCard.dataManager.submitRemoveCheckout item
+        itemTemplate.find(".c-student").append @ui.createStudentIconView item.student
+        itemTemplate.find(".dxwx-type").append $ "<span>#{item.type}</span>"
+        itemTemplate.find(".dxwx-date-leave").append $ "<span class=\"dxwx-detail-info\">#{moment(item.date_leave).format "MMM Do YYYY"}</span>"
+        itemTemplate.find(".dxwx-date-return").append $ "<span class=\"dxwx-detail-info\">#{moment(item.date_return).format "MMM Do YYYY"}</span>"
+        itemTemplate.find(".dxwx-time-leave").append $ "<span class=\"dxwx-detail-info\">#{item.time_leave}</span>"
+        itemTemplate.find(".dxwx-time-return").append $ "<span class=\"dxwx-detail-info\">#{item.time_return}</span>"
+        itemTemplate.find(".dxwx-location").append $ "<span class=\"dxwx-detail-info\">#{item.location}</span>"
+        itemTemplate.find(".dxwx-transport").append $ "<span class=\"dxwx-detail-info\">#{item.transport}</span>"
+        $statusView = itemTemplate.find(".status")
+        $statusView.click (event)=>
+          $(event.target).replaceWith @ui.generateSwitchPill item, OpenClosedStatus, (object, status) =>
+            if status.id is 1
+              FVSCard.dataManager.submitUpdateCheckout item.pub_id, status
+            else
+              FVSCard.dataManager.submitUpdateCheckout item.pub_id, status
+
+        $statusView
+          .text(currentStatus.text)
+          .css("background", currentStatus.bgcolor)
+        itemTemplate.find(".p-status-container").append $statusView
+
+        renderedList.push itemTemplate
+    renderedList
+
+class FVSStudentList extends FVSList
+  studentListSelector: ".list-container .student-list"
+
+  constructor: (ui, name) ->
+    super ui, name
+    @buttons = []
+
+  removeItemFromList: (item) ->
+    for i in [0...@items.length]
+      if item instanceof String
+        if @items[i].firstName is item or @items[i].lastName is item
+          @items.splice i, 1
+      else
+        if @items[i] is item
+          @items.splice i, 1
+
+  addButton: ($button) ->
+    @buttons.push $button
+
+  addButtons: (buttons) ->
+    @buttons.push.apply @buttons, buttons
+
+  clearButtons: ->
+    @buttons = []
+
+  setActionButtonEnabled: (enabled) ->
+    @enableActionButton = enabled
+
+  setPermissionsHintEnabled: (enabled) ->
+    @permissionsHintEnabled = enabled
+
+  render: ->
+    renderedList = []
+    for student in @items
       do (student) =>
         unless @mini
           itemTemplate = $ @ui.studentListItemHTML
@@ -552,6 +1244,32 @@ class FVSStudentList
           itemTemplate = $ @ui.studentSideListItemHTML
           $name = itemTemplate.find ".pane-info .student-name"
           $dorm = itemTemplate.find ".pane-info .student-dorm"
+          if @buttonless
+            itemTemplate.find(".button-container-side").remove()
+            itemTemplate.find(".pane-info").css "width", "60%"
+          else
+            for button in @buttons
+              itemTemplate.find(".button-container-side").append button
+            if @enableActionButton
+              $actionButton = itemTemplate.find(".action-button")
+              $actionButton.click =>
+                @ui.listAction(student)
+              $actionButton.mouseenter =>
+                itemTemplate.css "background", "#FFF1D6"
+              $actionButton.mouseleave =>
+                itemTemplate.css "background", "#fff"
+              $actionButton.show()
+              if @permissionHintEnabled
+                $actionButton.tooltip
+                  content: =>
+                    @ui.createPermissionsHint student
+                  disabled: false
+              else
+                $actionButton.tooltip
+                  disabled: true
+            else
+              itemTemplate.find(".action-button").hide()
+
           itemTemplate
             .find(".pane-info .student-indicator")
             .css("color", student.status.bgcolor)
@@ -563,8 +1281,8 @@ class FVSStudentList
 
         if @allowRemovals
           $closeButton.click =>
-            @removeStudentFromList student
-            @ui.tabPane.updateLists()
+            @removeItemFromList student
+            @ui.tabPane.updateListData()
             @onRemove student
         else
           $closeButton.css "display", "none"
@@ -574,8 +1292,7 @@ class FVSStudentList
 
 class FVSCardDataManager
 
-  constructor: (ui, data, request) ->
-    @ui = ui
+  constructor: (data, request) ->
     @students = []
     @lists = []
     @request = request
@@ -586,16 +1303,33 @@ class FVSCardDataManager
     @socket.on "session update", @sessionUpdate
     @socket.on "update student", @updateStudentStatus
     @socket.on "add checkin", @addEligableToCheckin
+    @socket.on "session created", @sessionCreated
     @socket.on "remove checkin", @removeEligableToCheckin
     @socket.on "reader update", @readerUpdate
     @socket.on "reader bind", @readerBind
     @socket.on "board update", @boardUpdate
     @socket.on "reader disconnected", @readerDisconnected
+    @socket.on "parietal added", @parietalAdd
+    @socket.on "parietal removed", @parietalRemoved
+    @socket.on "parietal update", @parietalUpdate
+    @socket.on "checkout added", @checkoutAdd
+    @socket.on "checkout removed", @checkoutRemove
+    @socket.on "checkout update", @checkoutUpdate
+    @socket.on "card swipe", @cardSwipe
 
-  createList: (name,students) ->
-    list = new FVSStudentList @ui,name
-    list.addAll students
+  setUI: (ui)->
+    @ui = ui
+
+  registerList: (name, list) ->
     @lists.push list
+    list
+
+  createList: (name,students, clazz) ->
+    unless clazz?
+      clazz = FVSStudentList
+    list = new clazz @ui,name
+    list.addAll students
+    @registerList name, list
     list
 
   removeList: (name) ->
@@ -604,19 +1338,18 @@ class FVSCardDataManager
         @lists.splice i,1
         return
 
-  addToList: (name, student, toStart) ->
+  addToList: (name, item, toStart) ->
     list = @findList name
-    console.log @lists
     if list?
       if toStart
-        list.pushStudentToList student
+        list.pushItemToList item
       else
-        list.addStudentToList student
+        list.addItemToList item
 
-  removeFromList: (name, student) ->
+  removeFromList: (name, item) ->
     list = @findList name
     if list?
-      list.removeStudentFromList student
+      list.removeItemFromList item
 
   findList: (name) ->
     for list in @lists
@@ -631,7 +1364,6 @@ class FVSCardDataManager
     @socket.emit "break bind"
 
   readerBind: (data) =>
-    console.log data
     if data.success
       @ui.sideContainerRight.readerBound data.data
     else
@@ -642,7 +1374,6 @@ class FVSCardDataManager
 
   inList: (student,name) ->
     list = @findList name
-    console.log list
     for res in list.students
       if res.pub_id is student.pub_id
         return true
@@ -660,29 +1391,110 @@ class FVSCardDataManager
   updateUi: ->
     @ui.updateScreens()
 
-  submitCreateSession: (tod, date)=>
+  submitGetPermissions: (student, callback) =>
+    @request
+      command: "get-permissions"
+      student_id: student.pub_id
+    , "GET", (response) =>
+      if not response.success and response.data?
+        @ui.showErrorMessage "Error", response.data
+      else if response.data?
+        callback response.data
+
+  submitCreateSession: (tod, custom, date, dorm)=>
     mDate = moment date,"MM/DD/YYYY"
     @request
       command: "create-session"
+      boardId: @board.pub_id
       type: tod
+      custom: custom
       date: mDate.toDate()
+      dorm: dorm
     , "GET", (response) =>
       if not response.success and response.data?
         @ui.showMessageDialog "Error",response.data
       else if response.data?
         @submitLoadSession response.data.type,moment(response.data.date).format "MM/DD/YYYY"
 
+  submitCreateCheckout: (checkout) ->
+    console.log checkout
+    @request
+      command: "create-checkout"
+      boardId: @board.pub_id
+      date_leave: checkout.date_leave
+      date_return: checkout.date_return
+      time_return: checkout.time_return
+      transport: checkout.transport
+      location: checkout.location
+      student_id: checkout.student.pub_id
+      type: checkout.type
+      open: checkout.open
+    , "GET", (response) =>
+      if not response.success and response.data?
+        @ui.showMessageDialog "Error", response.data
+
+  submitRemoveCheckout: (checkout) ->
+    @request
+      command: "remove-checkout"
+      pub_id: checkout.pub_id
+    , "GET", (response) ->
+      if not response.success and response.data?
+        @ui.showMessageDialog "Error", response.data
+
+  submitCreateParietal: (parietal) ->
+    @request
+      command: "create-parietal"
+      boardId: @board.pub_id
+      date: parietal.date
+      host: parietal.host.pub_id
+      guest: parietal.guest.pub_id
+      timeStart: parietal.timeIn
+      open: parietal.open
+    , "GET", (response) =>
+      if not response.success and response.data?
+        @ui.showMessageDialog "Error", response.data
+
+  submitRemoveParietal: (parietal) ->
+    @request
+      command: "remove-parietal"
+      pub_id: parietal.pub_id
+    , "GET", (response) =>
+      if not response.success and response.data?
+        @ui.showMessageDialog "Error", response.data
+
+  submitUpdateParietal: (id, status, time) ->
+    @request
+      command: "update-parietal-status"
+      pub_id: id
+      open: status.name is "open"
+      time_end: time
+    , "GET", (response) =>
+      if not response.success and response.data?
+        @ui.showMessageDialog "Error", response.data
+      else if response.data is null
+        @ui.tabPane.updateListData()
+
+  submitUpdateCheckout: (id, status) ->
+    @request
+      command: "update-checkout-status"
+      pub_id: id
+      open: status.name is "open"
+    , "GET", (response) =>
+      if not response.success and response.data?
+        @ui.showMessageDialog "Error", response.data
+      else if response.data is null
+        @ui.tabPane.updateListData()
+
   flipStateAndSubmit: =>
-    console.log @session
     @submitUpdateSession !@session.open
 
   flipBoardStateAndSubmit: =>
     @submitUpdateBoard !@board.open
 
   submitUpdateSession: (state)=>
-    console.log state
     if @session?
       @request
+        boardId: @board.pub_id
         command: "update-session-state"
         sessionId: @session.pub_id
         open: state
@@ -706,21 +1518,61 @@ class FVSCardDataManager
         command: "#{if eligable then "add" else "remove"}-tocheckin"
         student_id: student.pub_id
         checkin_id: @session.pub_id
-      , "GET", (response) ->
+      , "GET", (response) =>
         if not response.success and response.data?
-          @ui.showMessageDialog "Error",response.data
+          @ui.showMessageDialog "Error",response.data.message
 
-  submitLoadSession: (tod, date) =>
+  submitLoadSession: (tod, date, pub_id) =>
     mDate = moment date,"MM/DD/YYYY"
+    console.log date
+    console.log tod
     @request
+      boardId: @board.pub_id
       command: "load-session-data"
-      date: mDate.toDate()
-      type: tod
+      pub_id: pub_id if pub_id?
+      date: mDate.toDate() if date?
+      type: tod if tod?
     , "GET", (response) =>
       if not response.success and response.data?
         @ui.showMessageDialog "Error",response.data
       else if response.data?
         @enterSession response.data
+
+  submitGetPermissions: (student, callback) =>
+    @request
+      student_id: student.pub_id
+    , "GET", (response) =>
+      if not response.success and response.data?
+        @ui.showMessageDialog "Error", response.data
+      else if response.data?
+        callback response.data
+
+  submitLoadParietals: =>
+    unless @board?
+      throw new Error "No board loaded"
+    @request
+      command: "load-parietals"
+      boardId: @board.pub_id
+    , "GET", (response) =>
+      if not response.success and response.data?
+        @ui.showMessageDialog "Error", response.data
+      else if response.data?
+        for parietal in response.data
+          @parietalAdd parietal
+
+  submitLoadCheckouts: =>
+    unless @board?
+      throw new Error "No board loaded"
+    @request
+      command: "load-checkouts"
+      boardId: @board.pub_id
+    , "GET", (response) =>
+      if not response.success and response.data?
+        @ui.showMessageDialog "Error", response.data
+      else if response.data?
+        for checkout in response.data
+          @checkoutAdd checkout
+        @ui.tabPane.updateListData()
 
   submitLoadBoard: (date) =>
     mDate = moment date, "MM/DD/YYYY"
@@ -733,6 +1585,21 @@ class FVSCardDataManager
       else if response.data?
         @enterBoard response.data
 
+  getSessionList: (callback)=>
+    if @board?
+      @request
+        command: "load-sessions-for-board"
+        boardId: @board.pub_id
+      , "GET", (response) =>
+        if not response.success and response.data?
+          @ui.showMessageDialog "Error", response.data
+        else if response.data?
+          callback response.data
+
+  sessionCreated: (session) =>
+    if @board?
+      @ui.tabPane.tabScreenMap[1].addSessionEntry session
+
   submitCreateBoard: (date) =>
     mDate = moment date, "MM/DD/YYYY"
     @request
@@ -740,40 +1607,38 @@ class FVSCardDataManager
       date: mDate.toDate()
     , "GET", (response) =>
       if not response.success and response.data?
-        console.log response.data
         @ui.showMessageDialog "Error", response.data
       else if response.data?
-        console.log response
         @enterBoard response.data
 
-  beginCreateSession: ->
+  beginCreateSession: =>
     @ui.showSessionInfoPopup "Create Session", @submitCreateSession
 
-  beginFlipSessionStatus: ->
+  beginFlipSessionStatus: =>
     @ui.showConfirmDialog @flipStateAndSubmit
 
-  beginFlipBoardStatus: ->
+  beginFlipBoardStatus: =>
     @ui.showConfirmDialog @flipBoardStateAndSubmit
 
-  beginLoadSession: ->
+  beginLoadSession: =>
     @ui.showSessionInfoPopup "Load Session",@submitLoadSession
 
-  beginCreateBoard: ->
+  beginCreateBoard: =>
     @ui.showBoardInfoPopup "Create New Weekend Board", @submitCreateBoard
 
-  beginLoadBoard: ->
+  beginLoadBoard: =>
     @ui.showBoardInfoPopup "Load Weekend Board", @submitLoadBoard
 
-  beginExitSession: ->
+  beginExitSession: =>
     @ui.showConfirmDialog @exitSession
 
-  beginExitBoard: ->
+  beginExitBoard: =>
     @ui.showConfirmDialog @exitBoard
 
   enterSession: (res) =>
     @session = res.session
-    @createList("Session", [])
-    toCheckin = @createList("To Checkin", [])
+    console.log @session.dorm
+    toCheckin = @findList "Absent"
     toCheckin.setAllowRemovals true
     toCheckin.onRemove = (student) =>
       @submitEligableCheckin student, false
@@ -782,56 +1647,144 @@ class FVSCardDataManager
       student = @findStudent status.student_id
       student.setStatusById status.status
       student.eligableForCheckin = true
-      @addToList "To Checkin", student, false
+      @addToList "Absent", student, false
       @sessionSort student
-    @ui.tabPane.screen.updateList()
+    @ui.tabPane.triggerUpdate()
+    $.cookie "session-loaded", @session.pub_id
 
   enterBoard: (res) =>
     @board = res
     @ui.menuBar.enterWeekendBoard @board
-    @ui.studentList.enableActionButtons()
+    #TODO
+    $.cookie "board-loaded", @board.pub_id
 
   exitBoard: =>
     @board = null
+    @exitSession()
     @ui.menuBar.exitWeekendBoard()
-    @ui.studentList.disableActionButtons()
+    @ui.tabPane.resetScreens()
+    @resetBoardLists()
+    $.removeCookie "board-loaded"
+
+  resetBoardLists: =>
+    @findList("Ongoing")?.clearList()
+    @findList("Past")?.clearList()
+    @findList("Returned")?.clearList()
+    @findList("Off Campus")?.clearList()
 
   sessionSort: (student)=>
     if @session?
       if student.status.id is 1
         #TODO
-        @removeFromList "To Checkin", student
-        @removeFromList "Session", student
-        @addToList "To Checkin", student, true
+        @removeFromList "Absent", student
+        @removeFromList "Checked In", student
+        @addToList "Absent", student, true
       else
         #TODO
-        @removeFromList "Session", student
-        @removeFromList "To Checkin", student
-        @addToList "Session", student, true
+        @removeFromList "Checked In", student
+        @removeFromList "Absent", student
+        @addToList "Checked In", student, true
+
+  checkoutAdd: (checkout) =>
+    if checkout?
+      if @board and @board.pub_id is checkout.board_id
+        res = FVSCheckout.parse checkout
+        console.log res
+        if res.open
+          @addToList "Off Campus", res
+        else
+          @addToList "Returned", res
+        @ui.tabPane.updateListData(open)
+
+  checkoutRemove: (checkout) =>
+    if checkout?
+      if @board? and @board.pub_id is checkout.board_id
+        console.log "BUtts"
+        res = FVSCheckout.parse checkout
+        console.log res
+        @removeFromList "Off Campus", res
+        @removeFromList "Returned", res
+        @ui.tabPane.updateListData()
+
+  parietalAdd: (parietal) =>
+    if parietal?
+      if @board? and @board.pub_id is parietal.board_id
+        res = FVSParietal.parse parietal
+        if res.open
+          @addToList "Ongoing",res
+        else
+          @addToList "Past", res
+        @ui.tabPane.updateListData()
+
+  parietalRemoved: (parietal) =>
+    if parietal?
+      if @board? and @board.pub_id is parietal.board_id
+        res = FVSParietal.parse parietal
+        @removeFromList "Ongoing", res
+        @removeFromList "Past", res
+        @ui.tabPane.updateListData()
+
+  parietalUpdate: (parietal) =>
+    if @board? and @board.pub_id is parietal.board_id
+      currentParietal = @findList("Ongoing").findItem parietal.pub_id
+      unless currentParietal?
+        currentParietal = @findList("Past").findItem parietal.pub_id
+      currentParietal.open = parietal.open
+      currentParietal.timeOut = parietal.time_end
+      @removeFromList "Past", currentParietal
+      @removeFromList "Ongoing",currentParietal
+      if currentParietal.open
+        @addToList "Ongoing", currentParietal
+      else
+        @addToList "Past", currentParietal
+      @ui.tabPane.updateListData()
+
+  checkoutUpdate: (checkout) =>
+    if @board? and @board.pub_id is checkout.board_id
+      currentCheckout = @findList("Off Campus").findItem checkout.pub_id
+      unless currentCheckout?
+        currentCheckout = @findList("Returned").findItem checkout.pub_id
+      currentCheckout.open = checkout.open
+      @removeFromList "Off Campus", currentCheckout
+      @removeFromList "Returned", currentCheckout
+      if currentCheckout.open
+        @addToList "Off Campus", currentCheckout
+      else
+        @addToList "Returned", currentCheckout
+      @ui.tabPane.updateListData()
+
+  cardSwipe: (res)=>
+    unless res.success
+      console.log res.data
+    else
+      student = @findStudent res.data.student.pub_id
+      @ui.listAction student if @ui.listAction?
 
   exitSession: =>
     @session = null
     @ui.tabPane.screen.currentIndex = 0
-    @removeList "Session"
-    @removeList "To Checkin"
+    @removeList "Checked In"
+    @removeList "Absent"
+    @ui.tabPane.reset()
     @resetStudents()
-    @ui.tabPane.screen.updateList()
+    @ui.tabPane.triggerUpdate()
+    $.removeCookie "session-loaded"
 
   addEligableToCheckin: (status) =>
     if @session? and @session.pub_id is status.checkin_id
       student = @findStudent status.student_id
       unless student.eligableForCheckin
         student.eligableForCheckin = true
-        @addToList "To Checkin", student, true
-        @ui.tabPane.screen.updateList()
+        @addToList "Absent", student, true
+        @ui.tabPane.updateListData()
 
   removeEligableToCheckin: (status) =>
     if @session? and @session.pub_id is status.checkin_id
       student = @findStudent status.student_id
       if student.eligableForCheckin
         student.eligableForCheckin = false
-        @removeFromList "To Checkin", student
-        @ui.tabPane.screen.updateList()
+        @removeFromList "Absent", student
+        @ui.tabPane.updateListData()
 
   sessionUpdate: (session) =>
     if @session? and @session.pub_id is session.pub_id
@@ -849,7 +1802,7 @@ class FVSCardDataManager
       if student?
         student.setStatusById status.state
         @sessionSort student
-        @ui.tabPane.screen.updateList()
+        @ui.tabPane.updateListData()
 
   sendUpdateStudentStatus: (student, status) ->
     unless student.status is status
@@ -862,7 +1815,7 @@ class FVSCardDataManager
       , "GET", (res) ->
         return
     else
-      @ui.tabPane.screen.updateList()
+      @ui.tabPane.updateListData()
 
   class FVSCard
 
@@ -870,8 +1823,9 @@ class FVSCardDataManager
       @fvsCardRequest = request
       @state = BoardStatus.notInBoard
 
-      @ui = new FVSCardUI uiData
-      @dataManager = new FVSCardDataManager @ui, data, request
+      @dataManager = new FVSCardDataManager data, request
+      @ui = new FVSCardUI uiData, @dataManager
+      @dataManager.setUI @ui
 
       allStudents = @dataManager.createList "All Students", @dataManager.students
       day = @dataManager.createList "Day", []
@@ -881,15 +1835,15 @@ class FVSCardDataManager
           @dataManager.addToList "Day", student, false
         else
           @dataManager.addToList "Boarding", student, false
-      @ui.studentList.screen.addDisplayList "All Students", allStudents
-      @ui.studentList.screen.addDisplayList "Day",day
-      @ui.studentList.screen.addDisplayList "Boarding", bList
+      @ui.studentList.screen.addDisplayList allStudents
+      @ui.studentList.screen.addDisplayList day
+      @ui.studentList.screen.addDisplayList bList
+      @ui.studentList.screen.setDisplayList "All Students"
       @dataManager.updateUi()
 
       @ui.menuBar.exitWeekendBoard()
       @ui.sideContainerRight.readerUnbound()
       #@ui.tabPane.screen.setDisplayList "All Students"
-
 
   window.FVSCard =
     init: (request, ui, data) ->

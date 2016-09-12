@@ -9,9 +9,8 @@
       <div class="action-switcher-container">
         <ul class="tabs" id="action-switcher" style="display:none;">
           <li class="as-tab" id="parietals-switcher">Parietals</li>
-          <li class="as-tab" id="checkin-switcher">Meal Checks</li>
+          <li class="as-tab" id="checkin-switcher">Check In</li>
           <li class="as-tab" id="dxwx-switcher">DX/WX</li>
-          <li class="as-tab" id="stayingover-switcher">Staying Over</li>
         </ul>
       </div>
     </div>
@@ -33,13 +32,16 @@
        <ul class="tabs" id="tab-container"></ul>
     </div>
     <div class="bottom-container">
-      <input type="text" class="list-search-bar" placeholder="Search">
+      <div class="bottom-handle">
+        <input type="text" id="main-searchbar" class="list-search-bar" placeholder="Search">
+      </div>
       <div class="student-list"></div>
     </div>
   </div>
   <div class="side-container-right">
     <div class="reader-container">
-      <div class="reader-icon"></div>
+      <div class="reader-icon">
+      </div>
       <div class="reader-info-container">
         <div class="reader-message"></div>
         <div class="reader-action-container"></div>

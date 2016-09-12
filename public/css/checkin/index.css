@@ -1,14 +1,14 @@
 body {
   background-color: #eeeeee;
-  font-family: Verdana,sans-serif;
+  font-family: "Lucida Grande",sans-serif;
   overflow: hidden;
-  width: 100%;
+  height: 100%;
   margin: 0;
+  position: absolute;
 }
 .main-container{
   width: 100%;
   height: 100%;
-  position: relative;
   float: left;
   box-sizing: border-box;
 }
@@ -101,6 +101,7 @@ body {
   right: 0;
 }
 .side-container-right .reader-container{
+  font-size: 14px;
   height: 125px;
   background: #fff;
   width: 97%;
@@ -140,6 +141,49 @@ body {
   text-align: center;
   box-sizing: border-box;
 }
+.side-container-right .session-manipulator {
+  border-radius: 10px;
+  height: 80px;
+  background: #fff;
+  width: 97%;
+  float: right;
+  border-radius: 15px 0 0 15px;
+  border: 1px solid #ccc;
+  margin-top: 2%;
+}
+.side-container-right .session-manipulator .session-manipulator-select{
+  max-width: 230px;
+}
+.side-container-right .manipulator-container-top{
+  width: 100%;
+  position: relative;
+  margin: 5px;
+  height: 30px;
+}
+.side-container-right .manipulator-container-bottom{
+  width: 100%;
+  position: relative;
+}
+.side-container-right .manipulator-container-bottom .status-manipulator{
+  width: 96%;
+  border-radius: 5px;
+  text-align: center;
+  height: 30px;
+  color: #fff;
+  background: #ddd;
+  border: 1px #ccc solid;
+  line-height: 30px;
+  margin: 5px;
+  margin-top: 0;
+  font-size: 12px;
+  cursor: pointer;
+}
+.side-container-right .manipulator-container-top .session-manipulator .session-manipulator-select {
+  width: 65%;
+  margin-top: 15px;
+  margin-right: 3px;
+  margin-left: 10px;
+}
 .side-container-left {
   width: 25%;
   height: 100%;
@@ -161,7 +205,7 @@ body {
   margin-top: 2%;
   width: 97%;
   box-sizing: border-box;
-  height: 365px;
+  height: 85%;
   border: 1px solid #ddd;
   background: #fff;
   float: left;
@@ -211,15 +255,34 @@ body {
   position: relative;
   width: 100%;
   height: 30px;
-  cursor: pointer;
 }
-.list-container .tabhandle .tab-container {
-
+#tab-container {
   position: absolute;
-  height: 80%;
+  height: 100%;
   bottom: 0;
   padding-left: 3px;
   padding-right: 3px;
+}
+ul.tabs>.screen-tab{
+  border-radius: 5px 5px 0 0;
+  border: 1px solid #ddd;
+  border-bottom: 0;
+  margin-right: 3px;
+  height: 22px;
+  width: 70px;
+  text-align: center;
+  font-size: 11px;
+  cursor: pointer;
+  margin-top: 7px;
+  line-height: 22px;
+}
+.screen-tab-active{
+  background: #fff;
+  color: #333;
+}
+.screen-tab-off {
+  background: #eee;
+  color: #333;
 }
 ul.tabs {
   display: flex;
@@ -233,14 +296,13 @@ ul.tabs {
 }
 ul.tabs>li.tab, ul.tabs>li.as-tab {
   float: left;
-  padding-top: 5px;
   text-align: center;
   flex: 1;
   height: 100%;
   color: #fff;
   font-size: 11px;
   box-sizing: border-box;
-  line-height: 7px;
+  line-height: 20px;
   cursor: pointer;
 }
 ul.tabs>li.as-tab {
@@ -251,6 +313,11 @@ ul.tabs>li.as-tab {
 .active {
   background: #DC2E00;
 }
+.tab-disabled {
+  background: #eee;
+  color: #bbb;
+}
+
 .side-list-item {
   width: 100%;
   height: 60px;
@@ -260,22 +327,36 @@ ul.tabs>li.as-tab {
   float: left;
 }
 .side-list-item .pane-info {
-  width: 200px;
+  width: 60%;
   height: 100%;
   margin-left: 3px;
   float: left;
   font-size: 11px;
   padding: 3px;
 }
-.side-list-item .pane-info .student-dorm{
+.side-list-item .pane-info .pane-text .student-name{
+  font-style: bold;
+}
+.side-list-item .pane-info .pane-text .student-dorm{
   font-style: italic;
 }
+.side-list-item .button-container-side {
+  width: 20%;
+  height: 100%;
+  line-height: 60px;
+  float: left;
+  text-align: end;
+}
+.side-list-item .button-container-side .action-button{
+  cursor: pointer;
+  color: #ddd;
+}
 .side-list-item .student-photo {
-  width: 45px;
   height: 100%;
   float: left;
 }
 .side-list-item .student-indicator {
+
   width: 40px;
   height: 40px;
   float: left;
@@ -308,7 +389,11 @@ ul.tabs>li.as-tab {
 .list-container .bottom-container .student-list {
   width: 100%;
   height: 100%;
-  overflow: scroll;
+  overflow: auto;
+}
+.list-container .bottom-container .student-list .screen-label {
+  color: #999;
+  text-align: center;
 }
 .list-container .bottom-container .student-list .list-item {
   width: 100%;
@@ -327,6 +412,9 @@ ul.tabs>li.as-tab {
   height: 180px;
   width: 22%;
 }
+.list-container .bottom-container .student-list .list-item .pane-photo .student-photo{
+  border-radius: 6px;
+}
 .list-container .bottom-container .student-list .list-item .pane-info {
   float: left;
   position: relative;
@@ -336,26 +424,37 @@ ul.tabs>li.as-tab {
   height: 100%;
   box-sizing: border-box;
 }
-.list-container .bottom-container .student-list .list-item .pane-info .name {
+.list-container .bottom-container .student-list .list-item .pane-info .pane-text {
+  padding: 10px
+}
+.list-container .bottom-container .student-list .list-item .pane-info .pane-text .name {
   font-weight: bold;
 }
-.list-container .bottom-container .student-list .list-item .pane-info .dorm {
+.list-container .bottom-container .student-list .list-item .pane-info .pane-text .dorm {
   font-style: italic;
 }
-.list-container .bottom-container .student-list .list-item .status{
+.list-container .bottom-container .student-list .list-item .pane-info .student-status-container {
+  position: absolute;
   width: 100%;
+  bottom: 0;
+  width: 100%;
+}
+.status{
+  width: 95%;
   height: 40px;
   text-align: center;
   border-radius: 10px;
-  position: absolute;
-  bottom: 0;
+  position: relative;
   font-size: 20px;
   font-weight: bold;
   padding: 0;
+  box-sizing: border-box;
+  margin-left: 10px;
+  line-height: 35px;
   color: #fff;
   cursor: pointer;
 }
-.list-container .bottom-container .student-list .list-item .status-switcher-container{
+.status-switcher-container{
   width: 100%;
   height: 40px;
   text-align: center;
@@ -363,11 +462,12 @@ ul.tabs>li.as-tab {
   bottom: 0;
   font-size: 20px;
 }
-.list-container .bottom-container .student-list .list-item .status-switcher-container .status-switcher{
+.status-switcher-container .status-switcher{
   height: 100%;
   color: #fff;
   float:left;
   cursor: pointer;
+  line-height: 35px;
 }
 
 .list-container .bottom-container .student-list .list-item .button-container {
@@ -377,12 +477,14 @@ ul.tabs>li.as-tab {
   float: left;
   margin: 10px;
 }
+
 .list-container .bottom-container .student-list .list-item .button-container .button-close{
-  margin: 5px;
+23  margin: 5px;
   color: #aaa;
   cursor: pointer;
   float: left;
 }
+
 .list-container .bottom-container .student-list .list-item .button-container .button-add-checkin {
   float: left;
   height:15px;
@@ -392,9 +494,135 @@ ul.tabs>li.as-tab {
   color: #fff;
   padding: 7px;
 }
+
+.list-container .bottom-container .bottom-handle .createbutton {
+  width: 35px;
+  height: 35px;
+  font-size: 14px;
+  float: left;
+  line-height: 25px;
+  text-align: center;
+  box-sizing: border-box;
+  margin-bottom: 5px;
+  margin-right: 5px;
+  border-radius: 5px;
+}
+
+.list-container .bottom-container .student-list .dxwx-item{
+  width: 100%;
+  float: left;
+  height: 200px;
+  border-radius: 10px;
+  background-color: #fff;
+  padding: 10px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  position: relative;
+}
+
+.list-container .bottom-container .student-list .dxwx-item .c-student{
+  width: 30%;
+  height: 180px;
+  float: left;
+  overflow: scroll;
+  text-align: center;
+}
+.list-container .bottom-container .student-list .dxwx-item .c-student-create{
+  font-size: 11px;
+}
+.list-container .bottom-container .student-list .dxwx-item .dxwx-info{
+  width: 70%;
+  height: 100%;
+  float: left;
+  position: relative;
+}
+
+.list-container .bottom-container .student-list .dxwx-item .dxwx-info .dxwx-details{
+  height: 130px;
+  width: 100%;
+  position: relative;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+.list-container .bottom-container .student-list .dxwx-item .dxwx-info .dxwx-details .dxwx-type{
+  text-align: center;
+  font-weight: bold;
+  font-size: 13px;
+  width: 95%;
+  line-height: 18px;
+  margin: 0 auto;
+  height: 23px;
+  padding-top: 4px;
+  border-bottom: 1px solid #ccc;
+  color: #666;
+}
+.list-container .bottom-container .student-list .dxwx-item .dxwx-info .dxwx-details .dxwx-details-container{
+  padding: 10px;
+  overflow: scroll;
+  height: 85px;
+  text-align: left;
+}
+.list-container .bottom-container .student-list .dxwx-item .dxwx-info .dxwx-details .dxwx-details-container .dxwx-detail{
+  margin-bottom: 3px;
+  font-size: 13px;
+  font-weight: bold;
+}
+.list-container .bottom-container .student-list .dxwx-item .dxwx-info .dxwx-details .dxwx-details-container .dxwx-detail-info{
+  font-weight: normal;
+}
+.list-container .bottom-container .student-list .parietals-list-item {
+  width: 100%;
+  float: left;
+  height: 200px;
+  border-radius: 10px;
+  background-color: #fff;
+  padding: 10px;
+  margin-bottom: 10px;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  position: relative;
+}
+
+.list-container .bottom-container .student-list .parietals-list-item .p-container-right {
+  width: 55%;
+  height: 100%;
+  float: left;
+  position: relative;
+}
+
+.list-container .bottom-container .student-list .parietals-list-item .p-container-left {
+  width: 45%;
+  height: 100%;
+  float: left;
+  position: relative;
+}
+
+.p-student {
+  width: 125px;
+  height: 180px;
+  float: left;
+  text-align: center;
+}
+
+.p-student .p-pane-photo .p-student-photo{
+  width: 115px;
+  text-align: center;
+  border-radius: 6px;
+}
+
+.p-student .p-student-info{
+  text-align: center;
+  font-size: 11px;
+}
+
+.p-student .p-student-info{
+  font-style: italic;
+}
+
 .popup{
   min-width: 300px;
-  min-height: 150px;
   height:auto;
   max-height: 500px;
   max-width: 500px;
@@ -436,8 +664,7 @@ ul.tabs>li.as-tab {
   border-top: 1px solid #ddd;
   margin-top: 3px;
   background: #f5f5f5;
-  position: absolute;
-  bottom: 0;
+  position: relative;
 }
 .popup .popup-button-container .popup-button-subcontainer {
   width: auto;
@@ -459,7 +686,45 @@ ul.tabs>li.as-tab {
   padding:3px;
   box-sizing: border-box;
 }
-.popup .popup-button-container .ok-button{
+
+#session-name, #dorm-select{
+  height: 25px;
+  margin-top: 10px;
+}
+
+.create-button{
+  display: inline-block;
+  padding: 4px 10px 4px;
+  margin-bottom: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: #fff;
+  text-align: center;
+  text-shadow: 0 1px 1px rgba(255,255,255,0.75);
+  vertical-align: middle;
+  cursor: pointer;
+  background-color: #f5f5f5;
+  background-image: -ms-linear-gradient(top,#00D107,#00B006);
+  background-image: -webkit-gradient(linear,0 0,0 100%,from(#00D107),to(#00B006));
+  background-image: -webkit-linear-gradient(top,#00D107,#00B006);
+  background-image: -o-linear-gradient(top,#00D107,#00B006);
+  background-image: linear-gradient(top,#00D107,#00B006);
+  background-image: -moz-linear-gradient(top,#00D107,#00B006);
+  background-repeat: repeat-x;
+  border: 1px solid #ccc;
+  border-color: rgba(0,0,0,0.1) rgba(0,0,0,0.1) rgba(0,0,0,0.25);
+  border-color: #e6e6e6 #e6e6e6 #bfbfbf;
+  border-bottom-color: #b3b3b3;
+  -webkit-border-radius: 4px;
+  -moz-border-radius: 4px;
+  border-radius: 4px;
+  filter: progid:dximagetransform.microsoft.gradient(startColorstr='#ffffff',endColorstr='#e6e6e6',GradientType=0);
+  filter: progid:dximagetransform.microsoft.gradient(enabled=false);
+  -webkit-box-shadow: inset 0 1px 0 rgba(255,255,255,0.2),0 1px 2px rgba(0,0,0,0.05);
+  -moz-box-shadow: inset 0 1px 0 rgba(255,255,255,0.2),0 1px 2px rgba(0,0,0,0.05);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2),0 1px 2px rgba(0,0,0,0.05);
+}
+.ok-button{
   display: inline-block;
   padding: 4px 10px 4px;
   margin-bottom: 0;
@@ -516,7 +781,72 @@ input[type=text] {
 
 .popup .popup-content .createsession-datepicker , .popup .popup-content .opensession-datepicker {
   margin-bottom: 5px;
+
   width: 100%;
   text-align: center;
   font-size: 14px;
+}
+
+.fancy-input {
+  margin-bottom: 5px;
+  width: 100%;
+  text-align: center;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.p-placeholder {
+  height: 180px;
+  width: 125px;
+  font-size: 13px;
+  color: #777;
+  background: #eee;
+  border: 1px #999 solid;
+  border-radius: 5px;
+  float: left;
+  line-height: 170px;
+  text-align: center;
+}
+.parietals-list-item .p-container-right .graphic-container {
+  float: left;
+  font-size: 30px;
+  height: 180px;
+  margin: 0 7px;
+  color: #999;
+  line-height: 170px;
+}
+.p-status-container {
+  width: 100%;
+  float: left;
+  position: absolute;
+  bottom: 00;
+}
+.parietals-list-item .p-container-left .parietal-info {
+  width: 100%;
+  height: 120px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  position: relative;
+  padding: 5px;
+  padding-bottom: 5px;
+  box-sizing: border-box;
+  font-weight: bold;
+}
+.parietals-list-item .p-container-left .parietal-info .p-time-start, .parietals-list-item .p-container-left .parietal-info .p-time-end {
+  width: 100%;
+  float: left;
+  box-sizing: border-box;
+}
+
+.parietals-list-item .p-container-left .parietal-info .p-date{
+  position: absolute;
+  bottom: 0;
+  right: 3px;
+  color: #aaa;
+  font-size: 12px;
+}
+
+.float-label{
+  float: left;
+  font-size: 13px;
+  font-weight: bold;
 }

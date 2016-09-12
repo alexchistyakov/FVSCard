@@ -27,6 +27,7 @@ readerServer = net.createServer()
 
 readerHandler.useIo app.io
 readerHandler.useTcp readerServer
+readerHandler.useDB dbModels
 readerHandler.init()
 
 readerServer.listen config.readers.port

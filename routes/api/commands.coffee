@@ -1,5 +1,7 @@
 orm = require "orm"
+
 fs = require "fs"
+helpers = require "./helpers"
 module.exports =
   "load-essentials": (req, callback) ->
 
@@ -18,6 +20,7 @@ module.exports =
           dorm: student.house
           room: student.room
           card_id: student.card_id
+          phone_number: student.phone_number
 
       resHTMLs = {}
       dir = "#{__dirname}/../../views/client"
@@ -76,11 +79,77 @@ module.exports =
           open: res.open
         callback true, board
 
+  "load-parietals": (req, callback) ->
+    req.models.parietal.find
+      board_id: req.param "boardId"
+    , (err, parietals) ->
+      if err?
+        callback false, err
+      else
+        resParietals = []
+        for res in parietals
+          resParietals.push
+            board_id: res.board_id
+            pub_id: res.pub_id
+            host_id: res.host_id
+            visitor_id: res.visitor_id
+            time_start: res.time_start
+            time_end: res.time_end
+            date: res.date
+            open: res.open
+        callback true, resParietals
+
+  "load-checkouts": (req, callback) ->
+    req.models.checkout.find
+      board_id: req.param "boardId"
+    , (err, checkouts) ->
+      if err?
+        callback false, err
+      else
+        resCheckouts = []
+        for checkout in checkouts
+          item =
+            pub_id: checkout.pub_id
+            board_id: checkout.board_id
+            date_leave: checkout.date_leave
+            date_return: checkout.date_return
+            time_leave: checkout.time_leave
+            time_return: checkout.time_return
+            location: checkout.location
+            transport: checkout.transport
+            student_id: checkout.student_id
+            type: checkout.type
+            open: checkout.open
+          resCheckouts.push item
+        callback true, resCheckouts
+
+  "load-sessions-for-board": (req, callback) ->
+    req.models.checkinSession.find
+      board_id: req.param "boardId"
+    , (err, res) ->
+      if err?
+        callback false, err
+      else if not res?
+        callback true, []
+      else
+        resSessions = []
+        for session in res
+          resSessions.push
+            board_id: session.board_id
+            date: session.date
+            type: session.type
+            pub_id: session.pub_id
+            dorm: session.dorm
+            open: session.open
+        callback true, resSessions
+
   "load-session-data": (req, callback) ->
     req.models.checkinSession.one
       board_id: req.param "boardId"
-      date: new Date req.param "date"
-      type: req.param "type"
+      date: new Date( req.param("date")) if req.param("date")?
+      type: req.param("type") if req.param("type")?
+      pub_id: req.param("pub_id") if req.param("pub_id")?
+      dorm: res.param("dorm") if req.param("dorm")
     , (err, res) ->
       if err?
         callback false, err
@@ -89,7 +158,9 @@ module.exports =
       else
         session =
           pub_id: res.pub_id
+          board_id: res.board_id
           date: res.date
+          dorm: res.dorm
           type: res.type
           open: res.open
         req.models.studentStatus.find
@@ -107,11 +178,145 @@ module.exports =
                 status: status.state
             callback true, resOut
 
+  "update-checkout-status": (req, callback) ->
+    helpers.getDBItem "checkout", req.param("pub_id"), req.models, callback, (checkout) ->
+      toChange = req.param("open") is "true"
+      if toChange is checkout.open
+        callback true, null
+      else
+        checkout.open = toChange
+        checkout.save (err) ->
+          if err?
+            callback false, err
+          else
+            req.io.broadcast "checkout update", checkout
+            callback true, null
+
+  "remove-checkout": (req, callback) ->
+    helpers.getDBItem "checkout", req.param("pub_id"), req.models, callback, (checkout) ->
+      checkout.remove (err) ->
+        if err?
+          callback false, err
+        else
+          req.app.io.broadcast "checkout removed", checkout
+          callback true, null
+
+  "create-checkout": (req, callback) ->
+    req.models.checkout.exists
+      board_id: req.param "boardId"
+      student_id: req.param "student_id"
+      date_leave: new Date req.param "date_leave"
+      time_leave: req.param "time_leave"
+      type: req.param "type"
+    , (err, exists) ->
+      if err?
+        callback false, err
+      else if exists
+        callback false, "Checkout Already Exists"
+      else
+        req.models.checkout.create
+          board_id: req.param "boardId"
+          date_leave: new Date req.param "date_leave"
+          date_return: new Date req.param "date_return"
+          time_leave: req.param "time_leave"
+          time_return: req.param "time_leave"
+          location: req.param "location"
+          transport: req.param "transport"
+          student_id: req.param "student_id"
+          type: req.param "type"
+          open: req.param "open"
+        , (err, checkout) ->
+          if err?
+            callback false, err
+          else
+            req.app.io.broadcast "checkout added", checkout
+            callback true, null
+            req.models.studentStatus.find
+              student_id: checkout.student_id
+            , (err, statuses) ->
+              for status in statuses
+                req.models.checkinSession.one
+                  pub_id: status.checkin_id
+                , (err, session) ->
+                  if session.open?
+                    status.state = if checkout.type is "DX" then 2 else 3
+                    status.save (err)->
+                      req.app.io.broadcast "update student", status
+
+
+  "update-parietal-status": (req, callback) ->
+    helpers.getDBItem "parietal", req.param("pub_id"), req.models, callback, (parietal) ->
+      toChange = req.param("open") is "true"
+      if toChange is parietal.open
+        callback true, null
+      else
+        unless toChange
+          time = req.param "time_end"
+          unless time?
+            callback false, "Need an end time to close parietal"
+            return
+          parietal.time_end = time
+        else
+          parietal.time_end = null
+        parietal.open = toChange
+        parietal.save (err) ->
+          if err?
+            callback false, err
+          else
+            req.io.broadcast "parietal update", parietal
+            callback true, null
+
+  "remove-parietal": (req, callback) ->
+    helpers.getDBItem "parietal", req.param("pub_id"), req.models, callback, (parietal) ->
+      parietal.remove (err) ->
+        if err?
+          callback false, err
+        else
+          req.app.io.broadcast "parietal removed", parietal
+          callback true, null
+
+
+  "create-parietal": (req, callback) ->
+    req.models.parietal.exists
+      board_id: req.param "boardId"
+      date: new Date req.param "date"
+      visitor_id: req.param "guest"
+      host_id: req.param "host"
+      time_start: req.param "timeStart"
+    , (err, exists) ->
+      if err?
+        callback false, err
+      else if exists
+        callback false, "Parietal Already Exists"
+      else
+        req.models.parietal.create
+          board_id: req.param "boardId"
+          date: new Date req.param "date"
+          visitor_id: req.param "guest"
+          host_id: req.param "host"
+          time_start: req.param "timeStart"
+          open: req.param "open"
+        , (err, parietal) ->
+          if err?
+            callback false, err
+          else
+            res =
+              pub_id: parietal.pub_id
+              board_id: parietal.board_id
+              date: parietal.date
+              visitor_id: parietal.visitor_id
+              host_id: parietal.host_id
+              time_start: parietal.time_start
+              open: parietal.open
+            req.app.io.broadcast "parietal added", res
+            callback true, null
+
   "create-session": (req, callback) ->
     req.models.checkinSession.exists
       board_id: req.param "boardId"
       date: new Date req.param "date"
       type: req.param "type"
+      dorm: req.param "dorm"
     , (err, exists) ->
       if err?
         callback false, err
@@ -122,6 +327,7 @@ module.exports =
           board_id: req.param "boardId"
           date: new Date req.param "date"
           type: req.param "type"
+          dorm: req.param("dorm")
           open: false
         , (err,res) ->
           if err?
@@ -133,24 +339,39 @@ module.exports =
               date: res.date
               type: res.type
               open: res.open
-            req.models.student.find
-              room: orm.ne null
-            , (err, students) ->
-              toInsert = []
-              for student in students
-                item =
-                  checkin_id: res.pub_id
-                  student_id: student.pub_id
-                  state: 1
-                toInsert.push item
+              dorm: res.dorm
 
-              req.models.studentStatus.create toInsert
-              , (err,statuses) ->
-                if err? and not statuses?
-                  console.log err
-                  callback false, err
-                else
-                  callback true, session
+            req.models.checkout.find
+              board_id: res.board_id
+              open: true
+            , (err, checkouts) ->
+                req.models.student.find
+                  pub_id: "#" if req.param("custom")
+                  room: orm.ne(null) if not res.dorm?
+                  house: res.dorm if res.dorm?
+                , (err, students) =>
+                  toInsert = []
+                  for student in students
+                    item =
+                      checkin_id: res.pub_id
+                      student_id: student.pub_id
+                      state: 1
+                    toInsert.push item
+                  for checkout in checkouts
+                    for item in toInsert
+                      if checkout.student_id is item.student_id
+                        item.state = if checkout.type is "DX" then 2 else 3
+
+                  req.models.studentStatus.create toInsert
+                  , (err,statuses) ->
+                    console.log statuses
+                    if err?
+                      callback false, err
+                    if err? and not statuses?
+                      callback false, err
+                    else
+                      req.app.io.broadcast "session created", session
+                      callback true, session
 
   "update-board-state": (req, callback) ->
     req.models.weekendBoard.one
@@ -233,6 +454,13 @@ module.exports =
               checkin_id: status.checkin_id
               state: status.state
             req.app.io.broadcast "remove checkin", res
+
+  "get-permissions": (req, callback) ->
+    req.models.studentPermissions.one
+      student_id: req.param "student_id"
+    , (err, res) =>
+      helpers.respondErrorDuplicates err, res, true, callback, (res) =>
+        callback true, res
 
   "update-student": (req, callback) ->
     req.models.checkinSession.one

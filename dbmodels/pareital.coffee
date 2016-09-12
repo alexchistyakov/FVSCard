@@ -6,10 +6,12 @@ module.exports = (db,models) ->
     board_id:
       type: "text"
       required: true
-    date_in:
-      type: "date"
+    time_start:
+      type: "text"
       required: true
-    date_out:
+    time_end:
+      type: "text"
+    date:
       type: "date"
       required: true
     visitor_id:

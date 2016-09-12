@@ -4,15 +4,16 @@ async = require "async"
 init = false
 dbModels = null
 module.exports.express = orm.express config.database,
-  define: (db,models,callback) ->
+  define: (db,models,callback) =>
     dbModels = models
 
     models.student        = require("./student")(db,models)
     models.studentStatus  = require("./studentstatus")(db,models)
+    models.studentPermissions = require("./studentpermissions")(db, models)
     models.checkinSession = require("./checkinsession")(db,models)
     models.users          = require("./users")(db,models)
     models.checkout       = require("./checkout")(db,models)
-    models.pareital       = require("./pareital")(db,models)
+    models.parietal       = require("./pareital")(db,models)
     models.weekendBoard   = require("./weekendboard")(db,models)
 
     models.checkinSession.hasOne "user",models.users,

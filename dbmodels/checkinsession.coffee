@@ -10,9 +10,10 @@ module.exports = (db,models) ->
       type: "date"
       required: true
     type:
-      type: "enum"
-      values: ["Lunch","Dinner"]
+      type: "text"
       required: true
+    dorm:
+      type: "text"
     open:
       type: "boolean"
   ,
