@@ -211,29 +211,35 @@ class FVSTopMenuBar
   constructor: (tabPane) ->
     @tabPane = tabPane
     @currentIndex = 0
+    @prevInBoard = false
+    @updateState BoardStatus.notInBoard
     $actionSwitcher = $(@actionSwitcherSelector)
     $actionSwitcher.find("li").each (index, element) =>
       $(element).click =>
-        @tabPane.setScreen index
-        @currentIndex = index
-        @update()
+        unless @currentIndex is index
+          @tabPane.setScreen index
+          @currentIndex = index
+          @update()
 
   update: ->
+    console.log "THINGS"
     $actionSwitcher = $(@actionSwitcherSelector)
-    if @board?
-      @updateState BoardStatus.inBoard
-      @updateLabel "Weekend Board - " + moment(new Date @board.date_start).format("MMMM Do YYYY") + " - " + moment(new Date @board.date_end).format("MMMM Do YYYY") + " - " + if @board.open then "Open" else "Not Open"
-      $actionSwitcher.show()
-      $actionSwitcher.find("li").each (index, element) =>
-        if @currentIndex is index
-          $(element).addClass "pressed"
-        else
-          $(element).removeClass "pressed"
-      @tabPane.setScreen @currentIndex
-    else
-      @updateState BoardStatus.notInBoard
-      @updateLabel "No Weekend Board Loaded"
-      $actionSwitcher.hide()
+    $actionSwitcher.find("li").each (index, element) =>
+      if @currentIndex is index
+        $(element).addClass "pressed"
+      else
+        $(element).removeClass "pressed"
+    unless @board? is @prevInBoard
+      if @board?
+        @updateState BoardStatus.inBoard
+        @updateLabel "Weekend Board - " + moment(new Date @board.date_start).format("MMMM Do YYYY") + " - " + moment(new Date @board.date_end).format("MMMM Do YYYY") + " - " + if @board.open then "Open" else "Not Open"
+        $actionSwitcher.show()
+        @prevInBoard = true
+      else
+        @updateState BoardStatus.notInBoard
+        @updateLabel "No Weekend Board Loaded"
+        $actionSwitcher.hide()
+        @prevInBoard = false
 
     $buttonContainer = $ @buttonContainerSelector
     $buttonContainer.empty()
@@ -276,12 +282,12 @@ class FVSBottomTabPane
     @tabScreenMap[2] = new FVSCheckoutScreen @, @ui
 
   setScreen: (screen) ->
-    @currentScreenIndex = screen
     if @screen?
       @saveCurrentScreenState()
       @screen.unrender()
       @screen.disableSearch()
     @screen = @tabScreenMap[screen]
+    @currentScreenIndex = screen
     if @screen?
       if not @screen.loaded then @screen.load()
       @screen.enableSearch()
@@ -293,10 +299,12 @@ class FVSBottomTabPane
       @triggerUpdate()
 
   saveCurrentScreenState: ->
-    @tabScreenMapCache[@currentScreenIndex] = $(".student-list").html()
+    console.log "DICK"
+    @tabScreenMapCache[@currentScreenIndex] = $(".student-list").clone true
 
   loadScreenState: (slot) ->
-    $(".student-list").html @tabScreenMapCache[slot]
+    $(".student-list").empty()
+    $(".student-list").replaceWith @tabScreenMapCache[slot]
 
   triggerUpdate: ->
     @render()
